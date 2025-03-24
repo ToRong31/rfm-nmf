@@ -1,66 +1,82 @@
-import numpy as np
+
 import torch
-from rfm import LaplaceRFM, GeneralizedLaplaceRFM
-from rfm.generic_kernels import LaplaceKernel, ProductLaplaceKernel, LpqLaplaceKernel
-from rfm.generic_kernels import SumPowerLaplaceKernel
-from rfm.recursive_feature_machine import GenericRFM
-import time
+from torchvision import datasets, transforms
+from torch.utils.data import DataLoader, random_split
+from rfm import LaplaceRFM, GeneralizedLaplaceRFM, GaussRFM, NTKModel
+import torch.nn.functional as F
+import logging
 
-np.random.seed(0)
-torch.manual_seed(0)
+# Cấu hình logging: ghi log vào file và in ra console
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+formatter = logging.Formatter('%(asctime)s - %(message)s')
 
-M_batch_size = 256
+# File handler: ghi log vào output.txt
+file_handler = logging.FileHandler("output.txt")
+file_handler.setFormatter(formatter)
+logger.addHandler(file_handler)
 
-# def fstar(X):
-#     return torch.cat([
-#             (X[:, 0]  > 0)[:,None],
-#     	    (X[:, 1] < 0.5)[:, None]], 
-#     	    axis=1
-#         ).float()
+# Console handler: in log ra console
+console_handler = logging.StreamHandler()
+console_handler.setFormatter(formatter)
+logger.addHandler(console_handler)
 
-def fstar(X):
-    return (X[:, 0] ** 2)[:,None].float()
+# Hàm chuyển đổi batch: chuyển đổi nhãn thành one-hot encoding với 10 lớp
+def one_hot_collate(batch):
+    images, labels = zip(*batch)
+    images = torch.stack(images, 0)
+    labels = torch.tensor(labels)
+    # Chuyển đổi nhãn sang one-hot (float)
+    labels = F.one_hot(labels, num_classes=10).float()
+    return images, labels
 
-n = 500 # samples
-d = 100  # dimension
+# Thiết lập thiết bị và bộ nhớ GPU (nếu có)
+if torch.cuda.is_available():
+    DEVICE = torch.device("cuda")
+    DEV_MEM_GB = torch.cuda.get_device_properties(DEVICE).total_memory // 1024**3 - 1 
+else:
+    DEVICE = torch.device("cpu")
+    DEV_MEM_GB = 8
 
-bw = 200.
-reg = 1e-8
-iters=3
+# Định nghĩa transform: chuyển đổi ảnh MNIST thành tensor và làm phẳng thành vector 784 chiều
+transform = transforms.Compose([
+    transforms.ToTensor(),
+    transforms.Lambda(lambda x: x.view(-1))
+])
 
-X_train = torch.randn(n, d).cuda()
-X_test = torch.randn(n, d).cuda()
-y_train = fstar(X_train).cuda()
-y_test = fstar(X_test).cuda()
+# Tải dataset MNIST cho training và testing
+full_train_dataset = datasets.MNIST(root='./data', train=True, download=True, transform=transform)
+test_dataset = datasets.MNIST(root='./data', train=False, download=True, transform=transform)
 
-print(f'X_train.shape: {X_train.shape}, y_train.shape: {y_train.shape}')
+# Chia tập train ra thành một phần nhỏ để tránh làm đầy bộ nhớ
+subset_size = 10000  # Có thể điều chỉnh theo khả năng của máy
+train_subset, _ = random_split(full_train_dataset, [subset_size, len(full_train_dataset) - subset_size])
 
-model = LaplaceRFM(bandwidth=bw, diag=False, reg=reg, device='cuda', centering=True)
+# Tạo DataLoader cho tập train và test, sử dụng collate_fn để chuyển đổi nhãn
+batch_size = 16
+train_loader = DataLoader(train_subset, batch_size=batch_size, shuffle=True, collate_fn=one_hot_collate)
+test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, collate_fn=one_hot_collate)
 
+# Set a default p_batch_size value that will be used when None is passed
+default_p_batch_size = 8
 
-start_time = time.time()
-model.fit(
-    (X_train, y_train), 
-    (X_test, y_test), 
-    iters=iters,
-    classification=False,
-    M_batch_size=len(X_train),
-)
+# Khởi tạo các mô hình với cùng tham số cơ bản
+laplace_model = LaplaceRFM(bandwidth=1., device=DEVICE, mem_gb=DEV_MEM_GB, diag=False, p_batch_size=default_p_batch_size)
+generalized_model = GeneralizedLaplaceRFM(bandwidth=1., device=DEVICE, mem_gb=DEV_MEM_GB, diag=False, p_batch_size=default_p_batch_size)
+gauss_model = GaussRFM(bandwidth=1., device=DEVICE, mem_gb=DEV_MEM_GB, diag=False, p_batch_size=default_p_batch_size)
+ntk_model = NTKModel(device=DEVICE, mem_gb=DEV_MEM_GB, diag=False, p_batch_size=default_p_batch_size)
 
-print(f'LaplaceRFM Time: {time.time()-start_time:g} s')
+# Huấn luyện từng mô hình và ghi log, truyền thêm M_batch_size và p_batch_size để tránh lỗi
+logger.info("Training LaplaceRFM")
+laplace_model.fit(
+    train_loader, 
+    test_loader, 
+    loader=True, 
+    iters=3,
+    classification=True,  # Use the proper parameter name (classification instead of classif)
+    total_points_to_sample=subset_size,
+    M_batch_size=batch_size,
+    p_batch_size=default_p_batch_size,
 
-
-model = GenericRFM(LaplaceKernel(bandwidth=bw, exponent=1.0), diag=False, reg=reg, device='cuda', centering=True)
-
-start_time = time.time()
-
-model.fit(
-    (X_train, y_train), 
-    (X_test, y_test), 
-    iters=iters,
-    classification=False,
-    M_batch_size=len(X_train),
-)
-
-print(f'Generic time: {time.time()-start_time:g} s')
+ )
 
