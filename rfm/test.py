@@ -62,19 +62,24 @@ batch_size = 16
 train_loader = DataLoader(train_subset, batch_size=batch_size, shuffle=True, collate_fn=one_hot_collate)
 test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, collate_fn=one_hot_collate)
 
-# Khởi tạo các mô hình với cùng tham số cơ bản và đảm bảo tất cả các tham số đều ở trên cùng thiết bị
-laplace_model = LaplaceRFM(bandwidth=1., device=DEVICE, mem_gb=DEV_MEM_GB, diag=False)
+# Tham số cần điều chỉnh
+laplace_model = LaplaceRFM(
+    bandwidth=1.,  # Nên tune parameter này (thử giá trị 0.5-5)
+    device=DEVICE,
+    mem_gb=DEV_MEM_GB,
+    diag=False
+)
 
-# Huấn luyện mô hình LaplaceRFM
+# Phần huấn luyện nên sửa thành
 logger.info("Training LaplaceRFM")
 laplace_model.fit(
     train_data=train_loader,
     test_data=test_loader,
-    iters=3,
+    iters=3,  # Tham số này có thể conflict với epochs
     classification=True,
-    total_points_to_sample=subset_size,
-    M_batch_size=batch_size,
+    total_points_to_sample=subset_size, # Nên để None để dùng toàn bộ data
+    M_batch_size=128,  # Tăng batch size để tận dụng GPU
     method='eigenpro',
     verbose=True,
-    epochs=3,
+    epochs=3,  # Nên tăng số epochs (10-50)
 )
