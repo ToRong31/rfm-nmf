@@ -27,6 +27,12 @@ def one_hot_collate(batch):
     labels = torch.tensor(labels)
     # Chuyển đổi nhãn sang one-hot (float)
     labels = F.one_hot(labels, num_classes=10).float()
+    
+    # Đảm bảo rằng cả images và labels đều ở trên cùng một thiết bị
+    if torch.cuda.is_available():
+        images = images.to(DEVICE)
+        labels = labels.to(DEVICE)
+    
     return images, labels
 
 # Thiết lập thiết bị và bộ nhớ GPU (nếu có)
@@ -56,17 +62,10 @@ batch_size = 16
 train_loader = DataLoader(train_subset, batch_size=batch_size, shuffle=True, collate_fn=one_hot_collate)
 test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, collate_fn=one_hot_collate)
 
-# Set a default p_batch_size value that will be used when None is passed
-default_p_batch_size = 8
-
-# Khởi tạo các mô hình với cùng tham số cơ bản
-laplace_model = LaplaceRFM(bandwidth=1., device=DEVICE, mem_gb=DEV_MEM_GB, diag=False, p_batch_size=default_p_batch_size)
-generalized_model = GeneralizedLaplaceRFM(bandwidth=1., device=DEVICE, mem_gb=DEV_MEM_GB, diag=False, p_batch_size=default_p_batch_size)
-gauss_model = GaussRFM(bandwidth=1., device=DEVICE, mem_gb=DEV_MEM_GB, diag=False, p_batch_size=default_p_batch_size)
-ntk_model = NTKModel(device=DEVICE, mem_gb=DEV_MEM_GB, diag=False, p_batch_size=default_p_batch_size)
+# Khởi tạo các mô hình với cùng tham số cơ bản và đảm bảo tất cả các tham số đều ở trên cùng thiết bị
+laplace_model = LaplaceRFM(bandwidth=1., device=DEVICE, mem_gb=DEV_MEM_GB, diag=False)
 
 # Huấn luyện mô hình LaplaceRFM
-logger.info("Training LaplaceRFM")
 logger.info("Training LaplaceRFM")
 laplace_model.fit(
     train_data=train_loader,
@@ -77,67 +76,4 @@ laplace_model.fit(
     M_batch_size=batch_size,
     method='eigenpro',
     verbose=True,
-    epochs=10
-    # Loại bỏ p_batch_size vì hàm fit() không nhận tham số này
 )
-
-# # Huấn luyện mô hình GeneralizedLaplaceRFM
-# logger.info("Training GeneralizedLaplaceRFM")
-# generalized_model.fit(
-#     train_data=train_loader,
-#     test_data=test_loader,
-#     iters=3,
-#     classification=True,
-#     total_points_to_sample=subset_size,
-#     M_batch_size=batch_size,
-#     p_batch_size=default_p_batch_size,
-#     method='eigenpro',
-#     verbose=True,
-# )
-
-# # Huấn luyện mô hình GaussRFM
-# logger.info("Training GaussRFM")
-# gauss_model.fit(
-#     train_data=train_loader,
-#     test_data=test_loader,
-#     iters=3,
-#     classification=True,
-#     total_points_to_sample=subset_size,
-#     M_batch_size=batch_size,
-#     p_batch_size=default_p_batch_size,
-#     method='eigenpro',
-#     verbose=True,
-# )
-
-# # Huấn luyện mô hình NTKModel
-# logger.info("Training NTKModel")
-# ntk_model.fit(
-#     train_data=train_loader,
-#     test_data=test_loader,
-#     iters=3,
-#     classification=True,
-#     total_points_to_sample=subset_size,
-#     M_batch_size=batch_size,
-#     p_batch_size=default_p_batch_size,
-#     method='eigenpro',
-#     verbose=True,
-#)
-
-# Đánh giá các mô hình
-logger.info("Evaluating models on test data")
-
-# Đánh giá Laplace model
-laplace_accuracy = laplace_model.evaluate(test_loader)
-logger.info(f"LaplaceRFM test accuracy: {laplace_accuracy:.4f}")
-
-# # Đánh giá Generalized Laplace model
-# generalized_accuracy = generalized_model.evaluate(test_loader)
-# logger.info(f"GeneralizedLaplaceRFM test accuracy: {generalized_accuracy:.4f}")
-
-# # Đánh giá Gauss model
-# gauss_accuracy = gauss_model.evaluate(test_loader)
-# logger.info(f"GaussRFM test accuracy: {gauss_accuracy:.4f}")
-
-# # Đánh giá NTK model
-# ntk_accuracy = ntk_model.evaluate(test_loader)
-# logger.info(f"NTKModel test accuracy: {ntk_accuracy:.4f}")
