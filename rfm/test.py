@@ -76,4 +76,5 @@ laplace_model.fit(
     M_batch_size=batch_size,
     method='eigenpro',
     verbose=True,
+    epochs=3,
 )
