@@ -9,7 +9,7 @@ from sklearn.metrics import roc_auc_score
 from .svd import nystrom_kernel_svd
 from .nmf import multiplicative_update
 #248,288
-def asm_nmf_fn(samples, map_fn, rank=10, max_iter=100, init_mode='nndsvd', verbose=True):
+def asm_nmf_fn(samples, map_fn, rank=10, max_iter=100, init_mode='nndsvd', verbose=True, device="cuda"):
     """
     Approximate kernel matrix using custom NMF with multiplicative update.
     """
@@ -23,7 +23,8 @@ def asm_nmf_fn(samples, map_fn, rank=10, max_iter=100, init_mode='nndsvd', verbo
         print(f"NMF with init='{init_mode}' completed.")
         print(f"Final reconstruction error (Frobenius norm): {norms[-1]:.4f}")
 
-    return torch.from_numpy(W).float(), torch.from_numpy(H).float(), norms
+    # Move the results to the proper device (add this)
+    return torch.from_numpy(W).float().to(device), torch.from_numpy(H).float().to(device), norms
 
 class KernelModel(nn.Module):
     '''Fast Kernel Regression using EigenPro iteration.'''
