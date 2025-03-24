@@ -64,7 +64,7 @@ train_loader = DataLoader(train_subset, batch_size=batch_size, shuffle=True, col
 test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, collate_fn=one_hot_collate)
 
 # Tham số cần điều chỉnh
-laplace_model = LaplaceRFM(
+gene_model = GeneralizedLaplaceRFM(
     bandwidth=1.,  # Nên tune parameter này (thử giá trị 0.5-5)
     device=DEVICE,
     mem_gb=DEV_MEM_GB,
@@ -74,9 +74,9 @@ laplace_model = LaplaceRFM(
 # Phần huấn luyện nên sửa thành
 
 wandb.login(key='cf3dc9c85e2330a83d886a54b44d32768b2d7b60')
-wandb.init(project="rfm-nmf", name="Try3")
-logger.info("Training LaplaceRFM")
-laplace_model.fit(
+wandb.init(project="rfm-nmf", name="Generalized_LaplaceRFM")
+logger.info("Training Generalized_LaplaceRFM")
+gene_model.fit(
     train_data=train_loader,
     test_data=test_loader,
     iters=3,  # Tham số này có thể conflict với epochs
@@ -87,3 +87,4 @@ laplace_model.fit(
     verbose=True,
     epochs=3,  # Nên tăng số epochs (10-50)
 )
+wandb.finish()
