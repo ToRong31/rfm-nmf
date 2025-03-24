@@ -76,14 +76,14 @@ wandb.login(key='cf3dc9c85e2330a83d886a54b44d32768b2d7b60')
 wandb.init(project="rfm-nmf", name="NTK")
 logger.info("Training NTKModel")
 ntk_model.fit(
-    train_data=train_loader,
-    test_data=test_loader,
-    iters=3,  # Tham số này có thể conflict với epochs
+    train_loader, 
+    test_loader, 
+    loader=True, 
+    iters=3,
     classification=True,
-    total_points_to_sample=subset_size, # Nên để None để dùng toàn bộ data
-    M_batch_size=128,  # Tăng batch size để tận dụng GPU
+    total_points_to_sample=subset_size,
+    M_batch_size=batch_size,
     method='eigenpro',
-    verbose=True,
-    epochs=3,  # Nên tăng số epochs (10-50)
+    epochs=3
 )
 wandb.finish()
