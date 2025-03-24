@@ -6,7 +6,9 @@ from .generic_kernels import Kernel, LaplaceKernel
 from .kernels import laplacian_M, gaussian_M, euclidean_distances_M, laplacian_gen, get_laplace_gen_agop, ntk_kernel
 from tqdm.contrib import tenumerate
 from .utils import matrix_power, get_data_from_loader
+import wandb
 import time
+
 
 class RecursiveFeatureMachine(torch.nn.Module):
     """
@@ -231,26 +233,38 @@ class RecursiveFeatureMachine(torch.nn.Module):
         best_iter = None
         best_bandwidth = self.bandwidth if self.kernel_type != 'generic' else self.kernel_obj.bandwidth+0
         for i in range(iters):
+            start_time = time.time()
+
             self.fit_predictor(X_train, y_train, X_val=X_test, y_val=y_test, 
-                               classification=classification,
-                               bs=bs, lr_scale=lr_scale, 
-                               verbose=verbose, solver=solver, 
-                               **kwargs)
+                            classification=classification,
+                            bs=bs, lr_scale=lr_scale, 
+                            verbose=verbose, solver=solver, 
+                            **kwargs)
             
+            test_mse = self.score(X_test, y_test, bs, metric='mse')
+            log_data = {"epoch": i, "test_mse": test_mse}
+
             if classification:
                 test_acc = self.score(X_test, y_test, bs, metric='accuracy')
+                log_data["test_accuracy"] = test_acc
+
                 if method == 'lstsq':
                     train_acc = self.score(X_train, y_train, bs, metric='accuracy')
+                    log_data["train_accuracy"] = train_acc
                     if verbose:
                         print(f"Round {i}, Train Acc: {100*train_acc:.2f}%, Test Acc: {100*test_acc:.2f}%")
                 else:
                     if verbose:
                         print(f"Round {i}, Test Acc: {100*test_acc:.2f}%")
 
-            test_mse = self.score(X_test, y_test, bs, metric='mse')
-
             if verbose:
                 print(f"Round {i}, Test MSE: {test_mse:.4f}")
+            
+            elapsed_time = time.time() - start_time
+            log_data["epoch_time_sec"] = elapsed_time
+
+            wandb.log(log_data)
+
 
             # if classification and accuracy higher, or if regression and mse lower
             if return_best_params:
@@ -307,7 +321,15 @@ class RecursiveFeatureMachine(torch.nn.Module):
 
         if return_Ms:
             return Ms, mses
-            
+        
+        final_mse = self.score(X_test, y_test, bs=bs, metric='mse')
+        log_data = {"final_mse": final_mse}
+        if classification:
+            final_test_acc = self.score(X_test, y_test, bs=bs, metric='accuracy')
+            log_data["final_test_accuracy"] = final_test_acc
+
+        wandb.log(log_data)
+
         return final_mse
     
     def _compute_optimal_M_batch(self, n, c, d, scalar_size=4, mem_constant=2):

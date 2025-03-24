@@ -1,0 +1,42 @@
+{
+  "os":  "Windows-11-10.0.26100-SP0",
+  "python":  "CPython 3.12.3",
+  "startedAt":  "2025-03-24T11:37:51.271180Z",
+  "program":  "d:\\UIT\\New AGOP\\rfm\\test.ipynb",
+  "codePath":  "rfm\\test.ipynb",
+  "git":  {
+    "remote":  "https://github.com/ToRong31/rfm-nmf.git",
+    "commit":  "b8bf8d619ffa113d0335f81637d46276ffe25221"
+  },
+  "email":  "hoangtrongphm31@gmail.com",
+  "root":  "d:\\UIT\\New AGOP\\rfm",
+  "host":  "ToRong",
+  "executable":  "c:\\Users\\hoang\\anaconda3\\envs\\clean_env\\python.exe",
+  "codePathLocal":  "test.ipynb",
+  "cpu_count":  8,
+  "cpu_count_logical":  16,
+  "gpu":  "NVIDIA GeForce RTX 3050 Laptop GPU",
+  "gpu_count":  1,
+  "disk":  {
+    "/":  {
+      "total":  "264718249984",
+      "used":  "196603686912"
+    }
+  },
+  "memory":  {
+    "total":  "16850108416"
+  },
+  "cpu":  {
+    "count":  8,
+    "countLogical":  16
+  },
+  "gpu_nvidia":  [
+    {
+      "name":  "NVIDIA GeForce RTX 3050 Laptop GPU",
+      "memoryTotal":  "4294967296",
+      "cudaCores":  2048,
+      "architecture":  "Ampere"
+    }
+  ],
+  "cudaVersion":  "12.6"
+}
