@@ -64,8 +64,7 @@ train_loader = DataLoader(train_subset, batch_size=batch_size, shuffle=True, col
 test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, collate_fn=one_hot_collate)
 
 # Tham số cần điều chỉnh
-ntk_model =NTKModel(
-    bandwidth=1.,  # Nên tune parameter này (thử giá trị 0.5-5)
+ntk_model =NTKModel(  # Nên tune parameter này (thử giá trị 0.5-5)
     device=DEVICE,
     mem_gb=DEV_MEM_GB,
     diag=False
