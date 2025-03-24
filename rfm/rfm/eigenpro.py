@@ -190,7 +190,7 @@ class KernelModel(nn.Module):
         W_nmf, H_nmf, nmf_norms = asm_nmf_fn(samples, self.kernel_fn, rank=n_labels, verbose=verbose)
 
         def nmf_projection_fn(grad, kmat):
-            return W_nmf @ (H_nmf @ grad)
+            return W_nmf @ (H_nmf @ grad).to(self.device)
 
         # Learning rate
         if eta is None:

@@ -9,7 +9,7 @@ from sklearn.metrics import roc_auc_score
 from .svd import nystrom_kernel_svd
 from .nmf import multiplicative_update
 #248,288
-def asm_nmf_fn(samples, map_fn, rank=10, max_iter=100, init_mode='nndsvd', verbose=True):
+def asm_nmf_fn(samples, map_fn, rank=10, max_iter=100, init_mode='nndsvd', verbose=True, device="cuda"):
     """
     Approximate kernel matrix using custom NMF with multiplicative update.
     """
@@ -23,7 +23,8 @@ def asm_nmf_fn(samples, map_fn, rank=10, max_iter=100, init_mode='nndsvd', verbo
         print(f"NMF with init='{init_mode}' completed.")
         print(f"Final reconstruction error (Frobenius norm): {norms[-1]:.4f}")
 
-    return torch.from_numpy(W).float(), torch.from_numpy(H).float(), norms
+    # Move the results to the proper device (add this)
+    return torch.from_numpy(W).float().to(device), torch.from_numpy(H).float().to(device), norms
 
 class KernelModel(nn.Module):
     '''Fast Kernel Regression using EigenPro iteration.'''
@@ -143,11 +144,11 @@ class KernelModel(nn.Module):
         return eval_metrics
 
     def fit(self, X_train, y_train, X_val, y_val, epochs, mem_gb,
-            n_subsamples=None, top_q=None, bs=None, eta=None,
-            n_eval=1000, run_epoch_eval=True, lr_scale=1, 
-            verbose=True, seed=1, classification=False, threshold=1e-5,
-            early_stopping_window_size=7, eval_interval=1):
-        
+        n_subsamples=None, bs=None, eta=None, n_eval=1000, 
+        run_epoch_eval=True, lr_scale=1, verbose=True, seed=1, 
+        classification=False, threshold=1e-5, 
+        early_stopping_window_size=7, eval_interval=1):
+
         X_train = X_train.to(self.device)
         y_train = y_train.to(self.device)
         X_val = X_val.to(self.device)
@@ -159,8 +160,8 @@ class KernelModel(nn.Module):
         X_train_eval = X_train[train_eval_ids].clone()
         y_train_eval = y_train[train_eval_ids].clone()
 
-        assert(len(X_train)==len(y_train))
-        assert(len(X_val)==len(y_val))
+        assert(len(X_train) == len(y_train))
+        assert(len(X_val) == len(y_val))
 
         metrics = ('mse',)
         if classification:
@@ -177,148 +178,104 @@ class KernelModel(nn.Module):
         mem_bytes = (mem_gb - 1) * 1024**3  # preserve 1GB
         bsizes = np.arange(n_subsamples)
         mem_usages = ((self.x_dim + 3 * n_labels + bsizes + 1)
-                      * self.n_centers + n_subsamples * 1000) * 4
-        bs_gpu = np.sum(mem_usages < mem_bytes)  # device-dependent batch size
+                    * self.n_centers + n_subsamples * 1000) * 4
+        bs_gpu = np.sum(mem_usages < mem_bytes)
 
-        # Calculate batch size / learning rate for improved EigenPro iteration.
         np.random.seed(seed)
-        sample_ids = np.random.choice(n_samples, n_subsamples, replace=False)
-        sample_ids = self.tensor(sample_ids)
-        print(f"sample_ids: {sample_ids}")
-        samples = self.centers[sample_ids]
-        # === NMF Approximation ===
-        sample_ids = np.random.choice(n_samples, n_subsamples, replace=False)
-        sample_ids = self.tensor(sample_ids)
+        sample_ids_np = np.random.choice(n_samples, n_subsamples, replace=False)
+        sample_ids = self.tensor(sample_ids_np)
         samples = self.centers[sample_ids]
 
-        W, H, norms = asm_nmf_fn(samples, self.kernel_fn, rank=top_q or 10, max_iter=100, verbose=verbose)
-        beta = np.max([np.linalg.norm(H, axis=1).max(), np.linalg.norm(W, axis=1).max()])
-        top_eigval = norms[-1]
-        gap = 1.0
-        new_top_eigval = top_eigval
+        # Use NMF instead of SVD
+        W_nmf, H_nmf, nmf_norms = asm_nmf_fn(samples, self.kernel_fn, rank=n_labels, verbose=verbose)
 
-        def eigenpro_f(grad, kmat):
-            return W @ (H @ grad)
+        def nmf_projection_fn(grad, kmat):
+            return W_nmf @ (H_nmf @ grad).to(self.device)
 
-
+        # Learning rate
         if eta is None:
-            bs, eta = self._compute_opt_params(
-                bs, bs_gpu, beta, new_top_eigval)
-        else:
-            bs, _ = self._compute_opt_params(bs, bs_gpu, beta, new_top_eigval)
+            eta = 1.0
+        eta = self.tensor(lr_scale * eta / (bs or bs_gpu), dtype=torch.float)
+
+        if bs is None:
+            bs = bs_gpu
 
         if verbose:
-            print("n_subsamples=%d, bs_gpu=%d, eta=%.2f, bs=%d, top_eigval=%.2e, beta=%.2f" %
-                  (n_subsamples, bs_gpu, eta, bs, top_eigval, beta))
-        eta = self.tensor(lr_scale * eta / bs, dtype=torch.float)
-
+            print(f"Using NMF-based projection with rank={W_nmf.shape[1]}, eta={eta.item():.4f}, bs={bs}")
 
         res = dict()
         initial_epoch = 0
-        train_sec = 0  # training time in seconds
+        train_sec = 0
         best_weights = None
-        if classification:
-            best_metric = 0
-        else:
-            best_metric = float('inf')
-        
-        # Add early stopping variables
+        best_metric = 0 if classification else float('inf')
         val_loss_history = []
 
         for epoch in range(epochs):
             start = time.time()
-            for _ in range(epoch - initial_epoch):
-                # Create a permutation of all indices
-                epoch_ids = np.random.permutation(n_samples)
+            epoch_ids = np.random.permutation(n_samples)
+            save_kernel_matrix = epoch == 1 and self.save_kernel_matrix
 
-                save_kernel_matrix = epoch==1 and self.save_kernel_matrix
+            for batch_ids in tqdm(np.array_split(epoch_ids, n_samples // bs)):
+                batch_ids = self.tensor(batch_ids)
+                x_batch = self.tensor(X_train[batch_ids], dtype=X_train.dtype)
+                y_batch = self.tensor(y_train[batch_ids], dtype=y_train.dtype)
 
-                for batch_ids in tqdm(np.array_split(epoch_ids, n_samples // bs)):
-                    batch_ids = self.tensor(batch_ids)
-                    x_batch = self.tensor(X_train[batch_ids], dtype=X_train.dtype)
-                    y_batch = self.tensor(y_train[batch_ids], dtype=y_train.dtype)
-                    self.eigenpro_iterate(samples, x_batch, y_batch, eigenpro_f,
-                                          eta, sample_ids, batch_ids, save_kernel_matrix)
-                    del x_batch, y_batch, batch_ids
+                self.eigenpro_iterate(samples, x_batch, y_batch,
+                                    nmf_projection_fn, eta,
+                                    sample_ids, batch_ids,
+                                    save_kernel_matrix=save_kernel_matrix)
+                del x_batch, y_batch, batch_ids
 
-                if save_kernel_matrix:
-                    print(f"Storing kernel matrix")
-                    # First concatenate all rows
-                    concat_matrix = torch.cat([pair[1] for pair in self.kernel_matrix], dim=0)
-                    # Get all batch indices and their positions
-                    all_batch_ids = torch.cat([pair[0] for pair in self.kernel_matrix])
-                    # Get sorting indices and reorder the matrix
-                    _, sort_indices = torch.sort(all_batch_ids)
-                    self.kernel_matrix = concat_matrix[sort_indices]
-                    self.kernel_matrix = self.kernel_matrix.to(self.device)
+            if save_kernel_matrix:
+                print("Storing kernel matrix")
+                concat_matrix = torch.cat([pair[1] for pair in self.kernel_matrix], dim=0)
+                all_batch_ids = torch.cat([pair[0] for pair in self.kernel_matrix])
+                _, sort_indices = torch.sort(all_batch_ids)
+                self.kernel_matrix = concat_matrix[sort_indices].to(self.device)
 
-            if run_epoch_eval and epoch%eval_interval==0:
+            if run_epoch_eval and epoch % eval_interval == 0:
                 train_sec += time.time() - start
-                eval_start = time.time()
-                tr_score = self.evaluate(X_train_eval, y_train_eval, bs=bs, metrics=metrics)
-                eval_time = time.time() - eval_start
-                print(f"Train Eval time: {eval_time} seconds")
 
-                eval_start = time.time()
+                tr_score = self.evaluate(X_train_eval, y_train_eval, bs=bs, metrics=metrics)
                 tv_score = self.evaluate(X_val, y_val, bs=bs, metrics=metrics)
-                eval_time = time.time() - eval_start
-                print(f"Val Eval time: {eval_time} seconds")
-                
+
                 if verbose:
-                    out_str = f"({epoch} epochs, {train_sec} seconds)\t train l2: {tr_score['mse']} \tval l2: {tv_score['mse']}"
+                    out_str = f"({epoch} epochs, {train_sec:.1f}s)\ttrain mse: {tr_score['mse']:.4f} \tval mse: {tv_score['mse']:.4f}"
                     if classification:
                         if 'binary-acc' in tr_score:
-                            out_str += f"\ttrain binary acc: {tr_score['binary-acc']} \tval binary acc: {tv_score['binary-acc']}"
+                            out_str += f"\ttrain acc: {tr_score['binary-acc']:.4f} \tval acc: {tv_score['binary-acc']:.4f}"
                         else:
-                            out_str += f"\ttrain multiclass acc: {tr_score['multiclass-acc']} \tval multiclass acc: {tv_score['multiclass-acc']}"
+                            out_str += f"\ttrain acc: {tr_score['multiclass-acc']:.4f} \tval acc: {tv_score['multiclass-acc']:.4f}"
                         if 'f1' in tr_score:
-                            out_str += f"\ttrain f1: {tr_score['f1']} \tval f1: {tv_score['f1']}"
+                            out_str += f"\tf1: {tv_score['f1']:.4f}"
                         if 'auc' in tr_score:
-                            out_str += f"\ttrain auc: {tr_score['auc']} \tval auc: {tv_score['auc']}"
+                            out_str += f"\tauc: {tv_score['auc']:.4f}"
                     print(out_str)
 
                 res[epoch] = (tr_score, tv_score, train_sec)
 
-                # Track validation loss changes
-                if 'binary-acc' in tv_score:
-                    val_loss_history.append(tv_score['binary-acc'] <= best_metric)
-                elif 'multiclass-acc' in tv_score:
-                    val_loss_history.append(tv_score['multiclass-acc'] <= best_metric)
-                else:
-                    val_loss_history.append(tv_score['mse'] >= best_metric)
+                # Early stopping check
+                val_metric_key = (
+                    'auc' if 'auc' in tv_score else
+                    'binary-acc' if 'binary-acc' in tv_score else
+                    'multiclass-acc' if 'multiclass-acc' in tv_score else
+                    'mse'
+                )
+                current_metric = tv_score[val_metric_key]
+                improved = (current_metric > best_metric) if classification else (current_metric < best_metric)
+                val_loss_history.append(not improved)
+
+                if improved:
+                    best_metric = current_metric
+                    best_weights = self.weight.cpu().clone()
+                    val_loss_history = []
+                    print(f"New best {val_metric_key}: {best_metric:.4f}")
+
                 if len(val_loss_history) > early_stopping_window_size:
                     val_loss_history.pop(0)
-                    # Check if validation loss increased in majority of recent iterations
                     if sum(val_loss_history) / len(val_loss_history) >= 0.8:
-                        if verbose:
-                            print(f"Early stopping triggered: validation loss increased in majority of last {early_stopping_window_size} epochs")
+                        print("Early stopping triggered")
                         break
-
-                if classification:
-                    if 'auc' in tv_score:
-                        if tv_score['auc'] > best_metric:
-                            best_metric = tv_score['auc']
-                            best_weights = self.weight.cpu().clone()
-                            val_loss_history = []
-                            print(f"New best auc: {best_metric}")
-                    elif 'binary-acc' in tv_score:
-                        if tv_score['binary-acc'] > best_metric:
-                            best_metric = tv_score['binary-acc']
-                            best_weights = self.weight.cpu().clone()
-                            val_loss_history = []
-                            print(f"New best binary-acc: {best_metric}")
-                    elif 'multiclass-acc' in tv_score:
-                        if tv_score['multiclass-acc'] > best_metric:
-                            best_metric = tv_score['multiclass-acc']
-                            best_weights = self.weight.cpu().clone()
-                            val_loss_history = []
-                            print(f"New best multiclass-acc: {best_metric}")
-                else:
-                    if tv_score['mse'] < best_metric:
-                        best_metric = tv_score['mse']
-                        best_weights = self.weight.cpu().clone()
-                        val_loss_history = []
-                        print(f"New best mse: {best_metric}")
 
                 if tr_score['mse'] < threshold:
                     break
