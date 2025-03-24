@@ -128,7 +128,7 @@ class RecursiveFeatureMachine(torch.nn.Module):
                 start = time.time()
                 sub_weights = self.fit_predictor_lstsq(centers[random_indices], targets[random_indices], solver=solver)
                 end = time.time()
-                print(f"Time taken to prefit Eigenpro with {self.max_lstsq_size} points: {end-start} seconds")
+                print(f"Time taken to prefit nmf with {self.max_lstsq_size} points: {end-start} seconds")
                 initial_weights = torch.zeros_like(targets)
                 initial_weights[random_indices] = sub_weights.to(targets.device, dtype=targets.dtype)
             else:

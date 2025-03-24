@@ -70,8 +70,11 @@ laplace_model = LaplaceRFM(
     mem_gb=DEV_MEM_GB,
     diag=False
 )
+
 # Phần huấn luyện nên sửa thành
 logger.info("Training LaplaceRFM")
+wandb.login(key='cf3dc9c85e2330a83d886a54b44d32768b2d7b60')
+wandb.init(project="rfm-nmf", name="Try3")
 laplace_model.fit(
     train_data=train_loader,
     test_data=test_loader,
