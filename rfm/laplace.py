@@ -82,7 +82,7 @@ laplace_model.fit(
     iters=3,  # Tham số này có thể conflict với epochs
     classification=True,
     total_points_to_sample=subset_size, # Nên để None để dùng toàn bộ data
-    M_batch_size=128,  # Tăng batch size để tận dụng GPU
+    M_batch_size=64,  # Tăng batch size để tận dụng GPU
     method='eigenpro',
     verbose=True,
     epochs=3,  # Nên tăng số epochs (10-50)
