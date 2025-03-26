@@ -184,7 +184,7 @@ class RecursiveFeatureMachine(torch.nn.Module):
             classification=True, verbose=True, M_batch_size=None, 
             return_best_params=False, bs=None, 
             return_Ms=False, lr_scale=1, total_points_to_sample=20000, 
-            solver='solve', fit_last_M=False, prefit_eigenpro=True, 
+            solver='solve', fit_last_M=False, prefit_eigenpro=False, 
             **kwargs):
         """
         :param train_data: torch.utils.data.DataLoader or tuple of (X, y)
