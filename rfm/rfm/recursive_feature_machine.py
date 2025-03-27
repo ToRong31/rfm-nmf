@@ -1,4 +1,4 @@
-from .eigenpro import KernelModel
+from .nmfhtr import KernelModel
     
 import torch, numpy as np
 from torchmetrics.functional.classification import accuracy
@@ -122,8 +122,8 @@ class RecursiveFeatureMachine(torch.nn.Module):
                 self.M = torch.ones(centers.shape[-1], device=self.device, dtype=centers.dtype)
             else:
                 self.M = torch.eye(centers.shape[-1], device=self.device, dtype=centers.dtype)
-        if self.fit_using_eigenpro:
-            if self.prefit_eigenpro:
+        if self.fit_using_nmf:
+            if self.prefit_nmf:
                 random_indices = torch.randperm(centers.shape[0])[:self.max_lstsq_size]
                 start = time.time()
                 sub_weights = self.fit_predictor_lstsq(centers[random_indices], targets[random_indices], solver=solver)
@@ -134,7 +134,7 @@ class RecursiveFeatureMachine(torch.nn.Module):
             else:
                 initial_weights = None
 
-            self.weights = self.fit_predictor_eigenpro(centers, targets, bs=bs, lr_scale=lr_scale, 
+            self.weights = self.fit_predictor_nmf(centers, targets, bs=bs, lr_scale=lr_scale, 
                                                        verbose=verbose, classification=classification, 
                                                        initial_weights=initial_weights,
                                                        **kwargs)
@@ -166,7 +166,7 @@ class RecursiveFeatureMachine(torch.nn.Module):
         
         return out
 
-    def fit_predictor_eigenpro(self, centers, targets, bs, lr_scale, verbose, initial_weights=None, **kwargs):
+    def fit_predictor_nmf(self, centers, targets, bs, lr_scale, verbose, initial_weights=None, **kwargs):
         n_classes = 1 if targets.dim()==1 else targets.shape[-1]
         ep_model = KernelModel(self.kernel, centers, n_classes, device=self.device)
         if initial_weights is not None:
@@ -180,11 +180,11 @@ class RecursiveFeatureMachine(torch.nn.Module):
         return out.to(samples.device)
 
 
-    def fit(self, train_data, test_data, iters=None, method='eigenpro', 
+    def fit(self, train_data, test_data, iters=None, method='nmf', 
             classification=True, verbose=True, M_batch_size=None, 
             return_best_params=False, bs=None, 
             return_Ms=False, lr_scale=1, total_points_to_sample=20000, 
-            solver='solve', fit_last_M=False, prefit_eigenpro=True, 
+            solver='solve', fit_last_M=False, prefit_nmf=True, 
             **kwargs):
         """
         :param train_data: torch.utils.data.DataLoader or tuple of (X, y)
@@ -204,8 +204,8 @@ class RecursiveFeatureMachine(torch.nn.Module):
         :param prefit_eigenpro: if True, prefit EigenPro with a subset of <= max_lstsq_size samples
         """
         self.verbose = verbose
-        self.fit_using_eigenpro = (method.lower()=='eigenpro')
-        self.prefit_eigenpro = prefit_eigenpro
+        self.fit_using_nmf = (method.lower()=='nmf')
+        self.prefit_nmf = prefit_nmf
         self.use_sqrtM = self.kernel_type in ['laplacian_gen', 'generic']
         self.classification = classification
 
@@ -642,7 +642,7 @@ if __name__ == "__main__":
     model.fit(
         (X_train, y_train), 
         (X_test, y_test), 
-        loader=False, method='eigenpro', epochs=15, print_every=5,
+        loader=False, method='nmf', epochs=15, print_every=5,
         iters=5,
         classif=False
     ) 

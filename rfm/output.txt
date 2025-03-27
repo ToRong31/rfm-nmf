@@ -41,3 +41,57 @@
 2025-03-24 17:26:55,061 - Training LaplaceRFM
 2025-03-24 17:26:55,061 - Training LaplaceRFM
 2025-03-24 17:56:09,016 - Training LaplaceRFM
+2025-03-26 23:46:13,882 - Training NTKModel
+2025-03-26 23:46:53,971 - Training NTKModel
+2025-03-26 23:46:53,971 - Training NTKModel
+2025-03-26 23:47:34,431 - Training NTKModel
+2025-03-26 23:47:34,431 - Training NTKModel
+2025-03-26 23:47:34,431 - Training NTKModel
+2025-03-26 23:49:21,687 - Training NTKModel
+2025-03-26 23:49:21,687 - Training NTKModel
+2025-03-26 23:49:21,687 - Training NTKModel
+2025-03-26 23:49:21,687 - Training NTKModel
+2025-03-26 23:49:28,044 - Training NTKModel
+2025-03-26 23:49:28,044 - Training NTKModel
+2025-03-26 23:49:28,044 - Training NTKModel
+2025-03-26 23:49:28,044 - Training NTKModel
+2025-03-26 23:49:28,044 - Training NTKModel
+2025-03-26 23:54:01,580 - Training NTKModel
+2025-03-26 23:54:01,580 - Training NTKModel
+2025-03-26 23:54:01,580 - Training NTKModel
+2025-03-26 23:54:01,580 - Training NTKModel
+2025-03-26 23:54:01,580 - Training NTKModel
+2025-03-26 23:54:01,580 - Training NTKModel
+2025-03-26 23:55:01,133 - Training NTKModel
+2025-03-26 23:55:01,133 - Training NTKModel
+2025-03-26 23:55:01,133 - Training NTKModel
+2025-03-26 23:55:01,133 - Training NTKModel
+2025-03-26 23:55:01,133 - Training NTKModel
+2025-03-26 23:55:01,133 - Training NTKModel
+2025-03-26 23:55:01,133 - Training NTKModel
+2025-03-26 23:55:23,278 - Training NTKModel
+2025-03-26 23:55:23,278 - Training NTKModel
+2025-03-26 23:55:23,278 - Training NTKModel
+2025-03-26 23:55:23,278 - Training NTKModel
+2025-03-26 23:55:23,278 - Training NTKModel
+2025-03-26 23:55:23,278 - Training NTKModel
+2025-03-26 23:55:23,278 - Training NTKModel
+2025-03-26 23:55:23,278 - Training NTKModel
+2025-03-26 23:55:46,939 - Training NTKModel
+2025-03-26 23:55:46,939 - Training NTKModel
+2025-03-26 23:55:46,939 - Training NTKModel
+2025-03-26 23:55:46,939 - Training NTKModel
+2025-03-26 23:55:46,939 - Training NTKModel
+2025-03-26 23:55:46,939 - Training NTKModel
+2025-03-26 23:55:46,939 - Training NTKModel
+2025-03-26 23:55:46,939 - Training NTKModel
+2025-03-26 23:55:46,939 - Training NTKModel
+2025-03-26 23:55:47,945 - Test Accuracy: 0.9729
+2025-03-26 23:55:47,945 - Test Accuracy: 0.9729
+2025-03-26 23:55:47,945 - Test Accuracy: 0.9729
+2025-03-26 23:55:47,945 - Test Accuracy: 0.9729
+2025-03-26 23:55:47,945 - Test Accuracy: 0.9729
+2025-03-26 23:55:47,945 - Test Accuracy: 0.9729
+2025-03-26 23:55:47,945 - Test Accuracy: 0.9729
+2025-03-26 23:55:47,945 - Test Accuracy: 0.9729
+2025-03-26 23:55:47,945 - Test Accuracy: 0.9729

@@ -96,7 +96,7 @@ class KernelModel(nn.Module):
             eta = 0.99 * 2 * bs / (beta + (bs - 1) * top_eigval)
         return bs, float(eta)
 
-    def eigenpro_iterate(self, samples, x_batch, y_batch, eigenpro_fn,
+    def nmf_iterate(self, samples, x_batch, y_batch, nmf_fn,
                          eta, sample_ids, batch_ids, save_kernel_matrix=False):
         # update random coordiate block (for mini-batch)
         grad = self.primal_gradient(x_batch, y_batch, self.weight, batch_ids, save_kernel_matrix)
@@ -104,7 +104,7 @@ class KernelModel(nn.Module):
 
         # update fixed coordinate block (for EigenPro)
         kmat = self.get_kernel_matrix(x_batch, batch_ids, samples, sample_ids)
-        correction = eigenpro_fn(grad, kmat)
+        correction = nmf_fn(grad, kmat)
         self.weight.index_add_(0, sample_ids, eta * correction)
         return
 
@@ -188,6 +188,7 @@ class KernelModel(nn.Module):
 
         # Use NMF instead of SVD
         W_nmf, H_nmf, nmf_norms = asm_nmf_fn(samples, self.kernel_fn, rank=n_labels, verbose=verbose)
+        
 
         def nmf_projection_fn(grad, kmat):
             return W_nmf @ (H_nmf @ grad).to(self.device)
@@ -220,7 +221,7 @@ class KernelModel(nn.Module):
                 x_batch = self.tensor(X_train[batch_ids], dtype=X_train.dtype)
                 y_batch = self.tensor(y_train[batch_ids], dtype=y_train.dtype)
 
-                self.eigenpro_iterate(samples, x_batch, y_batch,
+                self.nmf_iterate(samples, x_batch, y_batch,
                                     nmf_projection_fn, eta,
                                     sample_ids, batch_ids,
                                     save_kernel_matrix=save_kernel_matrix)
