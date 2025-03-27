@@ -83,7 +83,7 @@ laplace_model.fit(
     classification=True,
     total_points_to_sample=subset_size, # Nên để None để dùng toàn bộ data
     M_batch_size=64,  # Tăng batch size để tận dụng GPU
-    method='eigenpro',
+    method='nmf',
     verbose=True,
     epochs=3,  # Nên tăng số epochs (10-50)
 )
