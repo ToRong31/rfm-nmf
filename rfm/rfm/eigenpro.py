@@ -189,8 +189,10 @@ class KernelModel(nn.Module):
         # Use NMF instead of SVD
         W_nmf, H_nmf, nmf_norms = asm_nmf_fn(samples, self.kernel_fn, rank=n_labels, verbose=verbose)
         
+        
 
         def nmf_projection_fn(grad, kmat):
+            print(f"W_nmf.shape: {W_nmf.shape}, H_nmf.shape: {H_nmf.shape}, grad.shape: {grad.shape}")
             return W_nmf @ (H_nmf @ grad).to(self.device)
 
         # Learning rate
