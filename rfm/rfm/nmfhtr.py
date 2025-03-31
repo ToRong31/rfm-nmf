@@ -7,24 +7,30 @@ import torch.nn as nn
 import numpy as np
 from sklearn.metrics import roc_auc_score
 from .svd import nystrom_kernel_svd
-from .nmf import multiplicative_update
+from .nmf import deep_nsnmf
 #248,288
 def asm_nmf_fn(samples, map_fn, rank=10, max_iter=100, init_mode='nndsvd', verbose=True, device="cuda"):
     """
-    Approximate kernel matrix using custom NMF with multiplicative update.
+    Approximate kernel matrix using dnsNMF.
     """
-    # kernel_matrix = map_fn(samples, samples)
     kernel_matrix = map_fn(samples, samples).cpu().numpy()
     kernel_matrix = np.maximum(kernel_matrix, 0)  # Ensure non-negativity
 
-    W, H, norms = multiplicative_update(kernel_matrix, k=rank, max_iter=max_iter, init_mode=init_mode)
+    # Define parameters for dnsNMF
+    layers = 2  # Example: 2-layer architecture
+    k_list = [rank, rank]  # Same rank for both layers
+    theta_list = [0.5, 0.5]  # Example smoothing parameters
+
+    W_list, H_list, S_list, norms_list = deep_nsnmf(
+        kernel_matrix, layers, k_list, theta_list, max_iter, init_mode
+    )
 
     if verbose:
-        print(f"NMF with init='{init_mode}' completed.")
-        print(f"Final reconstruction error (Frobenius norm): {norms[-1]:.4f}")
+        print(f"dnsNMF completed with final reconstruction error: {norms_list[-1][-1]:.4f}")
 
-    # Move the results to the proper device (add this)
-    return torch.from_numpy(W).float().to(device), torch.from_numpy(H).float().to(device), norms
+    # Return the top-layer W and H
+    W, H = W_list[-1], H_list[-1]
+    return torch.from_numpy(W).float().to(device), torch.from_numpy(H).float().to(device), norms_list
 
 class KernelModel(nn.Module):
     '''Fast Kernel Regression using EigenPro iteration.'''
