@@ -30,6 +30,7 @@ def asm_nmf_fn(samples, map_fn, rank=10, max_iter=100, init_mode='nndsvd', verbo
 
     # Return the top-layer W and H
     W, H = W_list[-1], H_list[-1]
+    
     return torch.from_numpy(W).float().to(device), torch.from_numpy(H).float().to(device), norms_list
 
 class KernelModel(nn.Module):

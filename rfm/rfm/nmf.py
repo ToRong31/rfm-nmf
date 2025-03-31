@@ -126,7 +126,11 @@ def deep_nsnmf(X, layers, k_list, theta_list, max_iter, init_mode='nndsvd', lamb
         # Update W_i (each layer's W)
         A_i = np.eye(X.shape[0])
         B_i = np.eye(H_list[-1].shape[0])
-
+        print(f"W_list[{i}].shape: {W_list[i].shape}")
+        print(f"A_i.T.shape: {A_i.T.shape}")
+        print(f"X.shape: {X.shape}")
+        print(f"(A_i.T @ X).shape: {(A_i.T @ X).shape}")
+        print(f"(A_i.T @ A_i @ W_list[i]).shape: {(A_i.T @ A_i @ W_list[i]).shape}")        
         for i in range(layers):
             if i == 0:
                 B_i = S_list[0]
