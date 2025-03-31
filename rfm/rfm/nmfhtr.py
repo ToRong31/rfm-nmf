@@ -9,7 +9,7 @@ from sklearn.metrics import roc_auc_score
 from .svd import nystrom_kernel_svd
 from .nmf import multiplicative_update
 #248,288
-def asm_nmf_fn(samples, map_fn, rank=10, max_iter=100, init_mode='nndsvd', verbose=True, device="cuda"):
+def asm_nmf_fn(samples, map_fn, rank=10, max_iter=500, init_mode='nndsvd', verbose=True, device="cuda"):
     """
     Approximate kernel matrix using custom NMF with multiplicative update.
     """

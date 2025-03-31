@@ -41,7 +41,6 @@ else:
 # Định nghĩa transform: chuyển đổi ảnh CIFAR-10 thành tensor và làm phẳng thành vector 3072 chiều (32x32x3)
 transform = transforms.Compose([
     transforms.ToTensor(),
-    transforms.Normalize((0.5,), (0.5,)),  # Chuẩn hóa giá trị pixel về khoảng [-1, 1]
     transforms.Lambda(lambda x: x.view(-1))  # Làm phẳng ảnh thành vector 3072 chiều
 ])
 
