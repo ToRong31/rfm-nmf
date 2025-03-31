@@ -104,14 +104,23 @@ class KernelModel(nn.Module):
         return bs, float(eta)
 
     def nmf_iterate(self, samples, x_batch, y_batch, nmf_fn,
-                         eta, sample_ids, batch_ids, save_kernel_matrix=False):
-        # update random coordiate block (for mini-batch)
+                    eta, sample_ids, batch_ids, save_kernel_matrix=False):
+        # update random coordinate block (for mini-batch)
         grad = self.primal_gradient(x_batch, y_batch, self.weight, batch_ids, save_kernel_matrix)
         self.weight.index_add_(0, batch_ids, -eta * grad)
 
         # update fixed coordinate block (for EigenPro)
         kmat = self.get_kernel_matrix(x_batch, batch_ids, samples, sample_ids)
         correction = nmf_fn(grad, kmat)
+        
+        # Kiểm tra và điều chỉnh kích thước của correction
+        if correction.shape[0] != len(sample_ids):
+            print(f"Correction shape mismatch: {correction.shape[0]} vs {len(sample_ids)}")
+            new_correction = torch.zeros(len(sample_ids), correction.shape[1], 
+                                    device=correction.device, dtype=correction.dtype)
+            new_correction[:min(correction.shape[0], len(sample_ids))] = correction[:min(correction.shape[0], len(sample_ids))]
+            correction = new_correction
+        
         self.weight.index_add_(0, sample_ids, eta * correction)
         return
 

@@ -105,6 +105,7 @@ class KernelModel(nn.Module):
         # update fixed coordinate block (for EigenPro)
         kmat = self.get_kernel_matrix(x_batch, batch_ids, samples, sample_ids)
         correction = eigenpro_fn(grad, kmat)
+        print(f"correction.shape: {correction.shape}, sample_ids.shape: {sample_ids.shape}")
         self.weight.index_add_(0, sample_ids, eta * correction)
         return
 
