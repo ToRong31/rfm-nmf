@@ -85,6 +85,7 @@ def multiplicative_update(A, k, max_iter, init_mode='nndsvd'):
 
     norms = []
     epsilon = 1.0e-10
+    lambda_sparseness = 0.1  # Sparseness parameter
     for _ in range(max_iter):
         # Update H
         W_TA = W.T @ A
@@ -93,7 +94,7 @@ def multiplicative_update(A, k, max_iter, init_mode='nndsvd'):
 
         # Update W
         AH_T = A @ H.T
-        WHH_T = W @ H @ H.T + epsilon
+        WHH_T = W @ H @ H.T + epsilon + lambda_sparseness * np.sum(W, axis=1, keepdims=True)
         W *= AH_T / WHH_T
 
         norm = np.linalg.norm(A - W @ H, 'fro')

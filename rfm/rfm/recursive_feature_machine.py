@@ -263,7 +263,7 @@ class RecursiveFeatureMachine(torch.nn.Module):
             elapsed_time = time.time() - start_time
             log_data["epoch_time_sec"] = elapsed_time
 
-            wandb.log(log_data)
+            #wandb.log(log_data)
 
 
             # if classification and accuracy higher, or if regression and mse lower
@@ -328,7 +328,7 @@ class RecursiveFeatureMachine(torch.nn.Module):
             final_test_acc = self.score(X_test, y_test, bs=bs, metric='accuracy')
             log_data["final_test_accuracy"] = final_test_acc
 
-        wandb.log(log_data)
+        #wandb.log(log_data)
 
         return final_mse
     
