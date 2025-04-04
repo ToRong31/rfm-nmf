@@ -21,17 +21,17 @@ def asm_nmf_fn(samples, map_fn, rank=10, max_iter=100, init_mode='nndsvd', verbo
     k_list = [rank, rank]  # Same rank for both layers
     theta_list = [0.5, 0.5]  # Example smoothing parameters
 
-    W_list, H_list, S_list, norms_list = deep_nsnmf(
-        kernel_matrix, layers, k_list, theta_list, max_iter, init_mode
+    W, H, S, norms = multiplicative_update_nsnmf(
+        kernel_matrix, layers, k_list, theta_list, max_iter, init_mode,lambda_sparseness=0.1
     )
 
     if verbose:
         print(f"dnsNMF completed with final reconstruction error: {norms_list[-1][-1]:.4f}")
 
-    # Return the top-layer W and H
-    W, H = W_list[-1], H_list[-1]
     
-    return torch.from_numpy(W).float().to(device), torch.from_numpy(H).float().to(device), norms_list
+    
+    
+    return torch.from_numpy(W).float().to(device), torch.from_numpy(H).float().to(device), torch.from_numpy(S).to(device), norms
 
 class KernelModel(nn.Module):
     '''Fast Kernel Regression using EigenPro iteration.'''
@@ -203,11 +203,11 @@ class KernelModel(nn.Module):
         samples = self.centers[sample_ids]
 
         # Use NMF instead of SVD
-        W_nmf, H_nmf, nmf_norms = asm_nmf_fn(samples, self.kernel_fn, rank=n_labels, verbose=verbose)
+        W_nmf, H_nmf,S_nmf, nmf_norms = asm_nmf_fn(samples, self.kernel_fn, rank=n_labels, verbose=verbose)
         
 
         def nmf_projection_fn(grad, kmat):
-            return W_nmf @ (H_nmf @ grad).to(self.device)
+            return W_nmf @ S_nmf @(H_nmf @ grad).to(self.device)
 
         # Learning rate
         if eta is None:
