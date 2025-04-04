@@ -21,17 +21,12 @@ def asm_nmf_fn(samples, map_fn, rank=10, max_iter=100, init_mode='nndsvd', verbo
     k_list = [rank, rank]  # Same rank for both layers
     theta_list = [0.5, 0.5]  # Example smoothing parameters
 
-    W, H, S, norms = multiplicative_update_nsnmf(
-        kernel_matrix, layers, k_list, theta_list, max_iter, init_mode,lambda_sparseness=0.1
+    W_list, H_list, S_list, norms = deep_nsnmf(
+        kernel_matrix,layers, k_list, theta_list, max_iter, init_mode,lambda_sparseness=0.1
     )
-
-    if verbose:
-        print(f"dnsNMF completed with final reconstruction error: {norms_list[-1][-1]:.4f}")
-
+    W, H, S = W_list[-1], H_list[-1], S_list[-1]
     
-    
-    
-    return torch.from_numpy(W).float().to(device), torch.from_numpy(H).float().to(device), torch.from_numpy(S).to(device), norms
+    return torch.from_numpy(W).float().to(device), torch.from_numpy(H).float().to(device), torch.from_numpy(S).float().to(device), norms
 
 class KernelModel(nn.Module):
     '''Fast Kernel Regression using EigenPro iteration.'''
