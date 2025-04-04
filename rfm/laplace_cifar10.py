@@ -28,6 +28,12 @@ def one_hot_collate(batch):
     labels = torch.tensor(labels)
     # Chuyển đổi nhãn sang one-hot (float)
     labels = F.one_hot(labels, num_classes=10).float()
+    
+    # Đảm bảo rằng cả images và labels đều ở trên cùng một thiết bị
+    if torch.cuda.is_available():
+        images = images.to(DEVICE)
+        labels = labels.to(DEVICE)
+    
     return images, labels
 
 # Thiết lập thiết bị và bộ nhớ GPU (nếu có)
@@ -38,10 +44,11 @@ else:
     DEVICE = torch.device("cpu")
     DEV_MEM_GB = 8
 
-# Định nghĩa transform: chuyển đổi ảnh CIFAR-10 thành tensor và làm phẳng thành vector 3072 chiều (32x32x3)
+# Định nghĩa transform: chuyển đổi ảnh CIFAR-10 thành tensor và chuẩn hóa
 transform = transforms.Compose([
     transforms.ToTensor(),
-    transforms.Lambda(lambda x: x.view(-1))  # Làm phẳng ảnh thành vector 3072 chiều
+    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),  # Chuẩn hóa ảnh RGB
+    transforms.Lambda(lambda x: x.view(-1))  # Làm phẳng ảnh thành vector
 ])
 
 # Tải dataset CIFAR-10 cho training và testing
@@ -67,7 +74,7 @@ laplace_model = LaplaceRFM(
 
 # Phần huấn luyện
 wandb.login(key='cf3dc9c85e2330a83d886a54b44d32768b2d7b60')
-wandb.init(project="rfm-nmf", name="CIFAR10-LaplaceRFM")
+wandb.init(project="rfm-nmf", name="LaplaceRFM-CIFAR10-NMF")
 logger.info("Training LaplaceRFM")
 laplace_model.fit(
     train_data=train_loader,
