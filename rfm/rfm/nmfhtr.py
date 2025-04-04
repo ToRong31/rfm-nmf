@@ -24,12 +24,6 @@ def asm_nmf_fn(samples, map_fn, rank=10, max_iter=100, init_mode='nndsvd', verbo
     W, H, S, norms = multiplicative_update_nsnmf(
         kernel_matrix, k_list, theta_list, max_iter, init_mode,lambda_sparseness=0.1
     )
-
-    if verbose:
-        print(f"dnsNMF completed with final reconstruction error: {norms_list[-1][-1]:.4f}")
-
-    
-    
     
     return torch.from_numpy(W).float().to(device), torch.from_numpy(H).float().to(device), torch.from_numpy(S).to(device), norms
 
