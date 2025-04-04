@@ -22,7 +22,7 @@ def asm_nmf_fn(samples, map_fn, rank=10, max_iter=100, init_mode='nndsvd', verbo
     theta_list = [0.5, 0.5]  # Example smoothing parameters
 
     W, H, S, norms = multiplicative_update_nsnmf(
-        kernel_matrix, layers, k_list, theta_list, max_iter, init_mode,lambda_sparseness=0.1
+        kernel_matrix, k_list, theta_list, max_iter, init_mode,lambda_sparseness=0.1
     )
 
     if verbose:
