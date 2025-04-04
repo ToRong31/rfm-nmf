@@ -22,7 +22,7 @@ def asm_nmf_fn(samples, map_fn, rank=10, max_iter=100, init_mode='nndsvd', verbo
     theta_list = [0.5, 0.5]  # Example smoothing parameters
 
     W_list, H_list, S_list, norms = deep_nsnmf(
-        kernel_matrix,players, k_list, theta_list, max_iter, init_mode,lambda_sparseness=0.1
+        kernel_matrix,layers, k_list, theta_list, max_iter, init_mode,lambda_sparseness=0.1
     )
     W,H,S=W_list[-1],H_list[-1],S_list[-1]
     return torch.from_numpy(W).float().to(device), torch.from_numpy(H).float().to(device), torch.from_numpy(S).to(device), norms
