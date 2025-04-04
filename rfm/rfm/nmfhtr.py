@@ -7,7 +7,7 @@ import torch.nn as nn
 import numpy as np
 from sklearn.metrics import roc_auc_score
 from .svd import nystrom_kernel_svd
-from .nmf import deep_nsnmf
+from .nmf import deep_nsnmf,multiplicative_update_nsnmf
 #248,288
 def asm_nmf_fn(samples, map_fn, rank=10, max_iter=100, init_mode='nndsvd', verbose=True, device="cuda"):
     """
