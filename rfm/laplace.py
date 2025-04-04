@@ -74,7 +74,14 @@ laplace_model = LaplaceRFM(
 # Phần huấn luyện nên sửa thành
 
 wandb.login(key='cf3dc9c85e2330a83d886a54b44d32768b2d7b60')
-wandb.init(project="rfm-nmf", name="Try3")
+wandb.init(project="rfm-nmf", name="LaplaceRFM-MNIST-lstsq", 
+           config={
+    "batch_size": batch_size,
+    "epochs": 3,
+    "bandwidth": 1.0,
+    "subset_size": subset_size,
+    "device": str(DEVICE),
+})
 logger.info("Training LaplaceRFM")
 laplace_model.fit(
     train_data=train_loader,
@@ -83,7 +90,7 @@ laplace_model.fit(
     classification=True,
     total_points_to_sample=subset_size, # Nên để None để dùng toàn bộ data
     M_batch_size=64,  # Tăng batch size để tận dụng GPU
-    method='nmf',
+    method='lstsq',
     verbose=True,
     epochs=3,  # Nên tăng số epochs (10-50)
 )
