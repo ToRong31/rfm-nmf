@@ -7,29 +7,36 @@ import torch.nn as nn
 import numpy as np
 from sklearn.metrics import roc_auc_score
 from .svd import nystrom_kernel_svd
-from .nmf import deep_nsnmf,multiplicative_update_nsnmf
+from .nmf import deep_nsnmf,multiplicative_update_nsnmf, reconstruct_X
+
+def to_tensor_list(np_list, device):
+    return [torch.from_numpy(arr).float().to(device) for arr in np_list]
 #248,288
 def asm_nmf_fn(samples, map_fn, rank=10, max_iter=100, init_mode='nndsvd', verbose=True, device="cuda"):
     """
-    Approximate kernel matrix using dnsNMF.
+    Approximate kernel matrix using dnsNMF in pure PyTorch.
     """
-    kernel_matrix = map_fn(samples, samples).cpu().numpy()
-    kernel_matrix = np.maximum(kernel_matrix, 0)  # Ensure non-negativity
+    kernel_matrix = map_fn(samples, samples)
+    kernel_matrix = kernel_matrix.clamp(min=0)  # non-negative
 
-    # Define parameters for dnsNMF
-    layers = 2  # Example: 2-layer architecture
-    k_list = [rank, rank]  # Same rank for both layers
-    theta_list = [0.5, 0.5]  # Example smoothing parameters
-    theta=0.5
-    # W_list, H_list, S_list, norms = deep_nsnmf(
-    #     kernel_matrix,layers, k_list, theta_list, max_iter, init_mode,lambda_sparseness=0.1
-    # )
-    # W,H,S=W_list[-1],H_list[-1],S_list[-1]
+    layers = 2
+    k_list = [rank] * layers
+    theta_list = [0.5] * layers
 
-    W, H, S, norms = multiplicative_update_nsnmf(
-        kernel_matrix, rank,theta, max_iter, init_mode=init_mode, lambda_sparseness=0.1)
-    
-    return torch.from_numpy(W).float().to(device), torch.from_numpy(H).float().to(device), torch.from_numpy(S).float().to(device), norms
+    # deep_nsnmf trả về Tensor
+    W_list, H_list, S_list, norms = deep_nsnmf(
+        kernel_matrix, layers, k_list, theta_list, max_iter, init_mode, lambda_sparseness=0.1
+    )
+
+    # đảm bảo tất cả là tensor đúng device
+    W_list = [w.to(device).float() for w in W_list]
+    H_list = [h.to(device).float() for h in H_list]
+    S_list = [s.to(device).float() for s in S_list]
+    norms = torch.tensor(norms, dtype=torch.float32).to(device)
+
+    return W_list, H_list, S_list, norms
+
+
 
 class KernelModel(nn.Module):
     '''Fast Kernel Regression using EigenPro iteration.'''
@@ -105,6 +112,10 @@ class KernelModel(nn.Module):
                     eta, sample_ids, batch_ids, save_kernel_matrix=False):
         # update random coordinate block (for mini-batch)
         grad = self.primal_gradient(x_batch, y_batch, self.weight, batch_ids, save_kernel_matrix)
+        grad = grad.to(self.weight.device)
+        batch_ids = batch_ids.to(self.weight.device)
+        eta = eta.to(self.weight.device)
+
         self.weight.index_add_(0, batch_ids, -eta * grad)
 
         # update fixed coordinate block (for EigenPro)
@@ -169,57 +180,44 @@ class KernelModel(nn.Module):
         y_val = y_val.to(self.device)
 
         n_eval = min(n_eval, len(X_train), len(X_val))
-        train_eval_ids = np.random.choice(len(X_train), n_eval, replace=False)
-
+        train_eval_ids = torch.randperm(len(X_train))[:n_eval]
         X_train_eval = X_train[train_eval_ids].clone()
         y_train_eval = y_train[train_eval_ids].clone()
 
-        assert(len(X_train) == len(y_train))
-        assert(len(X_val) == len(y_val))
+        assert len(X_train) == len(y_train)
+        assert len(X_val) == len(y_val)
 
         metrics = ('mse',)
         if classification:
-            if y_train.shape[-1] == 1:
-                metrics += ('binary-acc', 'f1', 'auc')
-            else:
-                metrics += ('multiclass-acc',)
+            metrics += ('binary-acc', 'f1', 'auc') if y_train.shape[-1] == 1 else ('multiclass-acc',)
 
         n_samples, n_labels = y_train.shape
         if n_subsamples is None:
             n_subsamples = min(n_samples, 12000)
-        n_subsamples = min(n_subsamples, n_samples)
 
-        mem_bytes = (mem_gb - 1) * 1024**3  # preserve 1GB
-        bsizes = np.arange(n_subsamples)
+        mem_bytes = (mem_gb - 1) * 1024**3
+        bsizes = torch.arange(n_subsamples)
         mem_usages = ((self.x_dim + 3 * n_labels + bsizes + 1)
                     * self.n_centers + n_subsamples * 1000) * 4
-        bs_gpu = np.sum(mem_usages < mem_bytes)
+        bs_gpu = int((mem_usages < mem_bytes).sum().item())
 
-        np.random.seed(seed)
-        sample_ids_np = np.random.choice(n_samples, n_subsamples, replace=False)
-        sample_ids = self.tensor(sample_ids_np)
+        torch.manual_seed(seed)
+        sample_ids = torch.randperm(n_samples)[:n_subsamples].to(self.device)
         samples = self.centers[sample_ids]
 
-        # Use NMF instead of SVD
-        W_nmf, H_nmf,S_nmf, nmf_norms = asm_nmf_fn(samples, self.kernel_fn, rank=n_labels, verbose=verbose)
-        
+        W_list, H_list, S_list, norms = asm_nmf_fn(samples, self.kernel_fn, rank=n_labels, verbose=verbose, device=self.device)
 
         def nmf_projection_fn(grad, kmat):
-            return W_nmf @ S_nmf @(H_nmf @ grad).to(self.device)
+            from .nmf import reconstruct_X
+            X_hat = reconstruct_X(W_list, S_list, H_list[-1])
+            return X_hat @ grad
 
-        # Learning rate
         if eta is None:
             eta = 1.0
-        eta = self.tensor(lr_scale * eta / (bs or bs_gpu), dtype=torch.float)
-
-        if bs is None:
-            bs = bs_gpu
-
-        if verbose:
-            print(f"Using NMF-based projection with rank={W_nmf.shape[1]}, eta={eta.item():.4f}, bs={bs}")
+        eta = torch.tensor(lr_scale * eta / (bs or bs_gpu), dtype=torch.float32, device=self.device)
+        bs = bs or bs_gpu
 
         res = dict()
-        initial_epoch = 0
         train_sec = 0
         best_weights = None
         best_metric = 0 if classification else float('inf')
@@ -227,26 +225,15 @@ class KernelModel(nn.Module):
 
         for epoch in range(epochs):
             start = time.time()
-            epoch_ids = np.random.permutation(n_samples)
-            save_kernel_matrix = epoch == 1 and self.save_kernel_matrix
+            epoch_ids = torch.randperm(n_samples)
 
-            for batch_ids in tqdm(np.array_split(epoch_ids, n_samples // bs)):
-                batch_ids = self.tensor(batch_ids)
-                x_batch = self.tensor(X_train[batch_ids], dtype=X_train.dtype)
-                y_batch = self.tensor(y_train[batch_ids], dtype=y_train.dtype)
+            for batch_ids in epoch_ids.split(bs):
+                x_batch = X_train[batch_ids]
+                y_batch = y_train[batch_ids]
 
                 self.nmf_iterate(samples, x_batch, y_batch,
-                                    nmf_projection_fn, eta,
-                                    sample_ids, batch_ids,
-                                    save_kernel_matrix=save_kernel_matrix)
-                del x_batch, y_batch, batch_ids
-
-            if save_kernel_matrix:
-                print("Storing kernel matrix")
-                concat_matrix = torch.cat([pair[1] for pair in self.kernel_matrix], dim=0)
-                all_batch_ids = torch.cat([pair[0] for pair in self.kernel_matrix])
-                _, sort_indices = torch.sort(all_batch_ids)
-                self.kernel_matrix = concat_matrix[sort_indices].to(self.device)
+                                nmf_projection_fn, eta,
+                                sample_ids, batch_ids)
 
             if run_epoch_eval and epoch % eval_interval == 0:
                 train_sec += time.time() - start
@@ -255,27 +242,19 @@ class KernelModel(nn.Module):
                 tv_score = self.evaluate(X_val, y_val, bs=bs, metrics=metrics)
 
                 if verbose:
-                    out_str = f"({epoch} epochs, {train_sec:.1f}s)\ttrain mse: {tr_score['mse']:.4f} \tval mse: {tv_score['mse']:.4f}"
+                    print(f"({epoch} epochs, {train_sec:.1f}s)\ttrain mse: {tr_score['mse']:.4f} \tval mse: {tv_score['mse']:.4f}")
                     if classification:
-                        if 'binary-acc' in tr_score:
-                            out_str += f"\ttrain acc: {tr_score['binary-acc']:.4f} \tval acc: {tv_score['binary-acc']:.4f}"
-                        else:
-                            out_str += f"\ttrain acc: {tr_score['multiclass-acc']:.4f} \tval acc: {tv_score['multiclass-acc']:.4f}"
+                        acc_key = 'binary-acc' if 'binary-acc' in tr_score else 'multiclass-acc'
+                        print(f"\ttrain acc: {tr_score[acc_key]:.4f} \tval acc: {tv_score[acc_key]:.4f}")
                         if 'f1' in tr_score:
-                            out_str += f"\tf1: {tv_score['f1']:.4f}"
+                            print(f"\tf1: {tv_score['f1']:.4f}")
                         if 'auc' in tr_score:
-                            out_str += f"\tauc: {tv_score['auc']:.4f}"
-                    print(out_str)
+                            print(f"\tauc: {tv_score['auc']:.4f}")
 
-                res[epoch] = (tr_score, tv_score, train_sec)
-
-                # Early stopping check
-                val_metric_key = (
-                    'auc' if 'auc' in tv_score else
-                    'binary-acc' if 'binary-acc' in tv_score else
-                    'multiclass-acc' if 'multiclass-acc' in tv_score else
-                    'mse'
-                )
+                val_metric_key = ('auc' if 'auc' in tv_score else
+                                'binary-acc' if 'binary-acc' in tv_score else
+                                'multiclass-acc' if 'multiclass-acc' in tv_score else
+                                'mse')
                 current_metric = tv_score[val_metric_key]
                 improved = (current_metric > best_metric) if classification else (current_metric < best_metric)
                 val_loss_history.append(not improved)
@@ -295,11 +274,5 @@ class KernelModel(nn.Module):
                 if tr_score['mse'] < threshold:
                     break
 
-            initial_epoch = epoch
-
         self.weight = best_weights.to(self.device)
-
-        if self.kernel_matrix is not None:
-            del self.kernel_matrix
-
         return res

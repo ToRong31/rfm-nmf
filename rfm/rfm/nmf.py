@@ -1,79 +1,106 @@
 import numpy as np
+import torch
 
-
-def random_initialization(A, k):
+def random_initialization(A, rank):
     """
-    Initialize W and H with random non-negative values.
+    Initialize matrices W and H randomly using PyTorch.
 
     Parameters:
-    - A: Input matrix
-    - k: Rank of the factorization
+    - A: Input matrix (torch tensor)
+    - rank: Rank of the factorization
 
     Returns:
-    - W: Initialized matrix W
-    - H: Initialized matrix H
+    - W: Initialized W matrix (torch tensor)
+    - H: Initialized H matrix (torch tensor)
     """
-    W = np.random.rand(A.shape[0], k)
-    H = np.random.rand(k, A.shape[1])
+    num_docs, num_terms = A.shape
+    device = A.device  # ✅ thêm dòng này
+    W = torch.empty(num_docs, rank, device=device).uniform_(1, 2)
+    H = torch.empty(rank, num_terms, device=device).uniform_(1, 2)
     return W, H
 
 
-def nndsvd_initialization(A, k):
+def nndsvd_initialization(A, rank):
     """
-    Initialize W and H using Nonnegative Double Singular Value Decomposition (NNDSVD).
+    Initialize matrices W and H using Non-negative Double Singular Value Decomposition (NNDSVD) with PyTorch.
 
     Parameters:
-    - A: Input matrix
-    - k: Rank of the factorization
+    - A: Input matrix (torch tensor)
+    - rank: Rank of the factorization
 
     Returns:
-    - W: Initialized matrix W
-    - H: Initialized matrix H
+    - W: Initialized W matrix (torch tensor)
+    - H: Initialized H matrix (torch tensor)
     """
-    # This is a simplified version. A full NNDSVD implementation is more complex.
-    # For simplicity, using random initialization here.
-    return random_initialization(A, k)
+    U, S, Vh = torch.linalg.svd(A, full_matrices=False)
+    V = Vh.T
+    device = A.device
+    W = torch.zeros((A.shape[0], rank), dtype=A.dtype, device=device)
+    H = torch.zeros((rank, A.shape[1]), dtype=A.dtype, device=device)
 
+
+    W[:, 0] = torch.sqrt(S[0]) * torch.abs(U[:, 0])
+    H[0, :] = torch.sqrt(S[0]) * torch.abs(V[:, 0])
+
+    for i in range(1, rank):
+        ui = U[:, i]
+        vi = V[:, i]
+
+        ui_pos = torch.clamp(ui, min=0)
+        ui_neg = torch.clamp(-ui, min=0)
+        vi_pos = torch.clamp(vi, min=0)
+        vi_neg = torch.clamp(-vi, min=0)
+
+        ui_pos_norm = torch.norm(ui_pos)
+        ui_neg_norm = torch.norm(ui_neg)
+        vi_pos_norm = torch.norm(vi_pos)
+        vi_neg_norm = torch.norm(vi_neg)
+
+        norm_pos = ui_pos_norm * vi_pos_norm
+        norm_neg = ui_neg_norm * vi_neg_norm
+
+        if norm_pos >= norm_neg:
+            W[:, i] = torch.sqrt(S[i] * norm_pos) * ui_pos / (ui_pos_norm + 1e-10)
+            H[i, :] = torch.sqrt(S[i] * norm_pos) * vi_pos / (vi_pos_norm + 1e-10)
+        else:
+            W[:, i] = torch.sqrt(S[i] * norm_neg) * ui_neg / (ui_neg_norm + 1e-10)
+            H[i, :] = torch.sqrt(S[i] * norm_neg) * vi_neg / (vi_neg_norm + 1e-10)
+
+    return W, H
+
+
+import torch
 
 def multiplicative_update_nsnmf(A, k, theta, max_iter, init_mode='nndsvd', lambda_sparseness=0.1):
     """
-    Perform Multiplicative Update (MU) algorithm for Non-negative Matrix Factorization (NMF).
-
-    Parameters:
-    - A: Input matrix
-    - k: Rank of the factorization
-    - theta: Smoothing parameter (0 <= theta <= 1)
-    - max_iter: Maximum number of iterations
-    - init_mode: Initialization mode ('random' or 'nndsvd')
-    - lambda_sparseness: Sparsity parameter
-
-    Returns:
-    - W: Factorized matrix W
-    - H: Factorized matrix H
-    - S: Smoothing Matrix
-    - norms: List of Frobenius norms at each iteration
+    Multiplicative Update algorithm for Non-smooth Non-negative Matrix Factorization using PyTorch.
     """
     if init_mode == 'random':
         W, H = random_initialization(A, k)
     elif init_mode == 'nndsvd':
         W, H = nndsvd_initialization(A, k)
+    else:
+        raise ValueError("Invalid init_mode. Use 'random' or 'nndsvd'.")
 
-    S = (1 - theta) * np.eye(k) + (theta / k) * np.ones((k, k))
+    device = A.device
+    dtype = A.dtype
+
+    S = (1 - theta) * torch.eye(k, device=device, dtype=dtype) + (theta / k) * torch.ones((k, k), device=device, dtype=dtype)
     norms = []
     epsilon = 1.0e-10
 
     for _ in range(max_iter):
         # Update H
-        W_TSA = W.T @ A
-        W_TSWH = W.T @ W @ S @ H + epsilon
-        H *= W_TSA / W_TSWH
+        W_TSA = W.t() @ A
+        W_TSWH = W.t() @ W @ S @ H
+        H = H * (W_TSA / torch.clamp(W_TSWH, min=epsilon))
 
         # Update W
-        AHS_T = A @ H.T @ S.T  # Corrected order for nsNMF
-        WSH_HT = W @ S @ H @ H.T @ S.T + epsilon + lambda_sparseness * np.sum(W, axis=1, keepdims=True)
-        W *= AHS_T / WSH_HT
+        AHS_T = A @ H.t() @ S.t()
+        WSH_HT = W @ S @ H @ H.t() @ S.t() + lambda_sparseness * torch.sum(W, dim=1, keepdim=True)
+        W = W * (AHS_T / torch.clamp(WSH_HT, min=epsilon))
 
-        norm = np.linalg.norm(A - W @ S @ H, 'fro')
+        norm = torch.norm(A - W @ S @ H, p='fro').item()
         norms.append(norm)
 
     return W, H, S, norms
@@ -81,22 +108,7 @@ def multiplicative_update_nsnmf(A, k, theta, max_iter, init_mode='nndsvd', lambd
 
 def deep_nsnmf(X, layers, k_list, theta_list, max_iter, init_mode='nndsvd', lambda_sparseness=0.1):
     """
-    Perform Deep Non-smooth Nonnegative Matrix Factorization (dnsNMF).
-
-    Parameters:
-    - X: Input matrix
-    - layers: Number of layers in the deep architecture
-    - k_list: List of ranks for each layer
-    - theta_list: List of smoothing parameters for each layer
-    - max_iter: Maximum number of iterations for each layer
-    - init_mode: Initialization mode ('random' or 'nndsvd')
-    - lambda_sparseness: Sparsity parameter
-
-    Returns:
-    - W_list: List of factorized matrices W for each layer
-    - H_list: List of factorized matrices H for each layer
-    - S_list: List of smoothing matrices for each layer
-    - norms_list: List of Frobenius norms at each layer and iteration
+    Deep Non-smooth Nonnegative Matrix Factorization using PyTorch.
     """
 
     W_list = []
@@ -115,7 +127,15 @@ def deep_nsnmf(X, layers, k_list, theta_list, max_iter, init_mode='nndsvd', lamb
         norms_list.append(norms)
         H_prev = H
 
-    # Skip fine-tuning to avoid dimension mismatch issues
-    # The initial factorization should provide good enough results
-
     return W_list, H_list, S_list, norms_list
+
+
+def reconstruct_X(W_list, S_list, H_final):
+    device = H_final.device
+    A = W_list[0].to(device)
+
+    for i in range(len(W_list) - 1):
+        A = A @ S_list[i].to(device) @ W_list[i + 1].to(device)
+
+    return A @ S_list[-1].to(device) @ H_final
+
