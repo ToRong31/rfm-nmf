@@ -91,7 +91,8 @@ laplace_model.fit(
     M_batch_size=64,
     method='lstsq',
     verbose=True,
-    epochs=3
+    epochs=3,
+    bandwidth=3.0,
 )
 
 wandb.finish()
