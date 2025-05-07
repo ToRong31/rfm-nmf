@@ -92,7 +92,7 @@ laplace_model.fit(
     method='lstsq',
     verbose=True,
     epochs=3,
-    bandwidth=3.0,
+    bandwidth=10.0,
 )
 
 wandb.finish()
