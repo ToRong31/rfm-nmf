@@ -74,7 +74,7 @@ laplace_model = LaplaceRFM(
 # Phần huấn luyện nên sửa thành
 
 wandb.login(key='cf3dc9c85e2330a83d886a54b44d32768b2d7b60')
-wandb.init(project="rfm-nmf", name="LaplaceRFM-MNIST-lstsq", 
+wandb.init(project="rfm-nmf", name="LaplaceRFM-MNIST-nmf_new", 
            config={
     "batch_size": batch_size,
     "epochs": 3,
