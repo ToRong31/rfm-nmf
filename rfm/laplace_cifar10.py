@@ -74,7 +74,7 @@ laplace_model = LaplaceRFM(
 
 # Phần huấn luyện
 wandb.login(key='cf3dc9c85e2330a83d886a54b44d32768b2d7b60')
-wandb.init(project="rfm-nmf", name="LaplaceRFM-CIFAR10-NMF")
+wandb.init(project="rfm-nmf", name="LaplaceRFM-CIFAR10-NMF_new")
 logger.info("Training LaplaceRFM")
 laplace_model.fit(
     train_data=train_loader,
