@@ -74,7 +74,7 @@ gene_model = GeneralizedLaplaceRFM(
 # Phần huấn luyện nên sửa thành
 
 wandb.login(key='cf3dc9c85e2330a83d886a54b44d32768b2d7b60')
-wandb.init(project="rfm-nmf", name="Generalized_LaplaceRFM")
+wandb.init(project="rfm-nmf", name="Generalized_LaplaceRFM_dnsnmf_new",)
 logger.info("Training Generalized_LaplaceRFM")
 gene_model.fit(
     train_data=train_loader,
