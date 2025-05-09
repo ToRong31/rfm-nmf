@@ -75,18 +75,18 @@ laplace_model = LaplaceRFM(
 # Phần huấn luyện
 wandb.login(key='cf3dc9c85e2330a83d886a54b44d32768b2d7b60')
 wandb.init(project="rfm-nmf", name="LaplaceRFM-CIFAR10-NMF_new")
-laplace_model.max_lstsq_size = 1000  # Kích thước tối đa cho lstsq
+laplace_model.max_lstsq_size = 400  # Kích thước tối đa cho lstsq
 logger.info("Training LaplaceRFM")
 laplace_model.fit(
     train_data=train_loader,
     test_data=test_loader,
-    iters=3,  # Tham số này có thể conflict với epochs
+    iters=50,  # Tham số này có thể conflict với epochs
     classification=True,
     total_points_to_sample=subset_size,  # Nên để None để dùng toàn bộ data
     M_batch_size=64,  # Tăng batch size để tận dụng GPU
     method='nmf',
     verbose=True,
-    epochs=3,  # Nên tăng số epochs (10-50)
+    epochs=10,  # Nên tăng số epochs (10-50)
     prefit_nmf=True,  # Sử dụng NMF để khởi tạo W và H
 )
 wandb.finish()
