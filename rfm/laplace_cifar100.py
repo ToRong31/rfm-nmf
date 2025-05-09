@@ -84,7 +84,7 @@ for bw in bandwidths:
             mem_gb=DEV_MEM_GB,
             diag=False
         )
-
+        model.max_lstsq_size = 800  # Kích thước tối đa cho lstsq
         model.fit(
             train_data=train_loader,
             test_data=test_loader,
@@ -93,7 +93,8 @@ for bw in bandwidths:
             M_batch_size=64,
             method='lstsq',
             verbose=True,
-            epochs=3
+            epochs=3,
+            prefit_nmf=True,
         )
 
         wandb.finish()
