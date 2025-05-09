@@ -12,14 +12,15 @@ from .nmf import deep_nsnmf,multiplicative_update_nsnmf, reconstruct_X
 def to_tensor_list(np_list, device):
     return [torch.from_numpy(arr).float().to(device) for arr in np_list]
 #248,288
-def asm_nmf_fn(samples, map_fn, rank=10, max_iter=100, init_mode='nndsvd', verbose=True, device="cuda"):
+def asm_nmf_fn(samples, map_fn, rank=10,layers=2, max_iter=100, init_mode='nndsvd', verbose=True, device="cuda"):
     """
     Approximate kernel matrix using dnsNMF in pure PyTorch.
     """
     kernel_matrix = map_fn(samples, samples)
-    kernel_matrix = kernel_matrix.clamp(min=0)  # non-negative
+    kernel_matrix = kernel_matrix - kernel_matrix.min()
+    kernel_matrix = kernel_matrix / (kernel_matrix.max() + 1e-8)
 
-    layers = 2
+   
     k_list = [rank] * layers
     theta_list = [0.5] * layers
 
@@ -205,7 +206,7 @@ class KernelModel(nn.Module):
         sample_ids = torch.randperm(n_samples)[:n_subsamples].to(self.device)
         samples = self.centers[sample_ids]
 
-        W_list, H_list, S_list, norms = asm_nmf_fn(samples, self.kernel_fn, rank=n_labels, verbose=verbose, device=self.device)
+        W_list, H_list, S_list, norms = asm_nmf_fn(samples, self.kernel_fn, rank=n_labels, layers=3, verbose=verbose, device=self.device)
 
         def nmf_projection_fn(grad, kmat):
             from .nmf import reconstruct_X

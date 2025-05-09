@@ -190,7 +190,7 @@ class RecursiveFeatureMachine(torch.nn.Module):
         :param train_data: torch.utils.data.DataLoader or tuple of (X, y)
         :param test_data: torch.utils.data.DataLoader or tuple of (X, y)
         :param iters: number of iterations to run
-        :param method: 'lstsq' or 'eigenpro'
+        :param method: 'lstsq' or 'dnsnmf'
         :param classification: if True, the model will tune for (and report) accuracy, else just MSE loss
         :param verbose: if True, print progress
         :param M_batch_size: batch size over samples for AGOP computation
@@ -263,7 +263,7 @@ class RecursiveFeatureMachine(torch.nn.Module):
             elapsed_time = time.time() - start_time
             log_data["epoch_time_sec"] = elapsed_time
 
-            wandb.log(log_data)
+            # wandb.log(log_data)
 
 
             # if classification and accuracy higher, or if regression and mse lower
@@ -328,7 +328,7 @@ class RecursiveFeatureMachine(torch.nn.Module):
             final_test_acc = self.score(X_test, y_test, bs=bs, metric='accuracy')
             log_data["final_test_accuracy"] = final_test_acc
 
-        wandb.log(log_data)
+        # wandb.log(log_data)
 
         return final_mse
     

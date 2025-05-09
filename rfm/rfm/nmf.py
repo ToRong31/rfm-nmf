@@ -14,7 +14,7 @@ def random_initialization(A, rank):
     - H: Initialized H matrix (torch tensor)
     """
     num_docs, num_terms = A.shape
-    device = A.device  # ✅ thêm dòng này
+    device = A.device  
     W = torch.empty(num_docs, rank, device=device).uniform_(1, 2)
     H = torch.empty(rank, num_terms, device=device).uniform_(1, 2)
     return W, H
@@ -68,8 +68,31 @@ def nndsvd_initialization(A, rank):
 
     return W, H
 
+def compute_local_S(W, sigma=1.0):
+    """
+    Tạo ma trận smoothing S theo locality từ vector W.
+    Dùng Gaussian affinity để tăng tính cục bộ cho dnsNMF.
 
-import torch
+    Parameters:
+    - W: torch.Tensor, shape (rank, d) — hàng là vector cơ sở
+    - sigma: hệ số điều chỉnh độ mượt
+
+    Returns:
+    - S: torch.Tensor, shape (rank, rank)
+    """
+    with torch.no_grad():
+        # Chuẩn hóa W để ổn định
+        W_norm = W / (W.norm(dim=1, keepdim=True) + 1e-8)
+
+        # Tính khoảng cách Euclidean giữa các hàng
+        dist = torch.cdist(W_norm, W_norm, p=2)  # shape: (k, k)
+
+        # Tính affinity theo Gaussian
+        affinity = torch.exp(-dist ** 2 / (2 * sigma ** 2))
+
+        # Chuẩn hóa theo hàng (row stochastic)
+        S = affinity / (affinity.sum(dim=1, keepdim=True) + 1e-8)
+    return S
 
 def multiplicative_update_nsnmf(A, k, theta, max_iter, init_mode='nndsvd', lambda_sparseness=0.1):
     """
@@ -85,7 +108,10 @@ def multiplicative_update_nsnmf(A, k, theta, max_iter, init_mode='nndsvd', lambd
     device = A.device
     dtype = A.dtype
 
-    S = (1 - theta) * torch.eye(k, device=device, dtype=dtype) + (theta / k) * torch.ones((k, k), device=device, dtype=dtype)
+    # S = (1 - theta) * torch.eye(k, device=device, dtype=dtype) + (theta / k) * torch.ones((k, k), device=device, dtype=dtype)
+    S = compute_local_S(W.T, sigma=1.0)
+
+
     norms = []
     epsilon = 1.0e-10
 
@@ -108,7 +134,7 @@ def multiplicative_update_nsnmf(A, k, theta, max_iter, init_mode='nndsvd', lambd
 
 def deep_nsnmf(X, layers, k_list, theta_list, max_iter, init_mode='nndsvd', lambda_sparseness=0.1):
     """
-    Deep Non-smooth Nonnegative Matrix Factorization using PyTorch.
+    Deep Non-smooth Nonnegative Matrix Factorization .
     """
 
     W_list = []
