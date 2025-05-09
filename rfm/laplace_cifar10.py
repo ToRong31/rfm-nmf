@@ -74,7 +74,7 @@ laplace_model = LaplaceRFM(
 
 # Phần huấn luyện
 wandb.login(key='cf3dc9c85e2330a83d886a54b44d32768b2d7b60')
-wandb.init(project="rfm-nmf", name="LaplaceRFM-CIFAR10-NMF_new")
+wandb.init(project="rfm-nmf", name="LaplaceRFM-CIFAR10-NMF_new_100lstsq")
 laplace_model.max_lstsq_size = 100  # Kích thước tối đa cho lstsq
 logger.info("Training LaplaceRFM")
 laplace_model.fit(
