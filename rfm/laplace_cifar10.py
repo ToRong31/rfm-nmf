@@ -44,12 +44,15 @@ else:
     DEVICE = torch.device("cpu")
     DEV_MEM_GB = 8
 
-# Định nghĩa transform: chuyển đổi ảnh CIFAR-10 thành tensor và chuẩn hóa
-transform = transforms.Compose([
-    transforms.ToTensor(),
-    transforms.Lambda(lambda x: x.view(-1))  # Làm phẳng ảnh thành vector
-])
+# CIFAR-10 mean & std
+mean = [0.4914, 0.4822, 0.4465]
+std  = [0.2470, 0.2435, 0.2616]
 
+transform = transforms.Compose([
+    transforms.ToTensor(),                              # [0,1]
+    transforms.Normalize(mean, std),                    # chuẩn hóa mỗi kênh
+    transforms.Lambda(lambda x: x.view(-1))             # flatten thành vector d=3*32*32=3072
+])
 # Tải dataset CIFAR-10 cho training và testing
 full_train_dataset = datasets.CIFAR10(root='./data', train=True, download=True, transform=transform)
 test_dataset = datasets.CIFAR10(root='./data', train=False, download=True, transform=transform)
