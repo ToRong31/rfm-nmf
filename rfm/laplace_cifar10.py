@@ -47,7 +47,6 @@ else:
 # Định nghĩa transform: chuyển đổi ảnh CIFAR-10 thành tensor và chuẩn hóa
 transform = transforms.Compose([
     transforms.ToTensor(),
-    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),  # Chuẩn hóa ảnh RGB
     transforms.Lambda(lambda x: x.view(-1))  # Làm phẳng ảnh thành vector
 ])
 
@@ -73,8 +72,8 @@ laplace_model = LaplaceRFM(
 )
 
 # Phần huấn luyện
-wandb.login(key='cf3dc9c85e2330a83d886a54b44d32768b2d7b60')
-wandb.init(project="rfm-nmf", name="LaplaceRFM-CIFAR10-NMF_new_100lstsq")
+# wandb.login(key='cf3dc9c85e2330a83d886a54b44d32768b2d7b60')
+# wandb.init(project="rfm-nmf", name="LaplaceRFM-CIFAR10-NMF_new_100_lstsq")
 laplace_model.max_lstsq_size = 100  # Kích thước tối đa cho lstsq
 logger.info("Training LaplaceRFM")
 laplace_model.fit(
@@ -89,4 +88,4 @@ laplace_model.fit(
     epochs=10,  # Nên tăng số epochs (10-50)
     prefit_nmf=True,  # Sử dụng NMF để khởi tạo W và H
 )
-wandb.finish()
+# wandb.finish()
