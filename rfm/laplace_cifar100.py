@@ -60,41 +60,42 @@ batch_size = 16
 train_loader = DataLoader(train_subset, batch_size=batch_size, shuffle=True, collate_fn=one_hot_collate)
 test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, collate_fn=one_hot_collate)
 
-bandwidths = [0.5, 1.0, 2.0, 5.0]
-sample_sizes = [500, 1000, 2000, 5000]
+bw = 1.0
+pts = 10000
+run_name = f"Laplace_bw{bw}_pts{pts}"
+logger.info(f"=== Training {run_name} ===")
 
-for bw in bandwidths:
-    for pts in sample_sizes:
-        run_name = f"Laplace_bw{bw}_pts{pts}"
-        logger.info(f"=== Training {run_name} ===")
+wandb.init(
+    project="rfm-nmf",
+    name=run_name,
+    config={
+        "bandwidth": bw,
+        "total_points_to_sample": pts,
+        "device": str(DEVICE),
+        "subset_size": subset_size,
+        "dataset": "CIFAR100",
+        "feature_extractor": "None (raw image)"
+    }
+)
 
-        wandb.init(project="rfm-nmf", name=run_name,
-                   config={
-                       "bandwidth": bw,
-                       "total_points_to_sample": pts,
-                       "device": str(DEVICE),
-                       "subset_size": subset_size,
-                       "dataset": "CIFAR100",
-                       "feature_extractor": "None (raw image)"
-                   })
+model = LaplaceRFM(
+    bandwidth=bw,
+    device=DEVICE,
+    mem_gb=DEV_MEM_GB,
+    diag=False
+)
+model.max_lstsq_size = 800  # Kích thước tối đa cho lstsq
 
-        model = LaplaceRFM(
-            bandwidth=bw,
-            device=DEVICE,
-            mem_gb=DEV_MEM_GB,
-            diag=False
-        )
-        model.max_lstsq_size = 800  # Kích thước tối đa cho lstsq
-        model.fit(
-            train_data=train_loader,
-            test_data=test_loader,
-            classification=True,
-            total_points_to_sample=pts,
-            M_batch_size=64,
-            method='lstsq',
-            verbose=True,
-            epochs=3,
-            prefit_nmf=True,
-        )
+model.fit(
+    train_data=train_loader,
+    test_data=test_loader,
+    classification=True,
+    total_points_to_sample=pts,
+    M_batch_size=64,
+    method='lstsq',
+    verbose=True,
+    epochs=3,
+    prefit_nmf=True,
+)
 
-        wandb.finish()
+wandb.finish()
