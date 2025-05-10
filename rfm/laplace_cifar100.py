@@ -60,7 +60,7 @@ batch_size = 16
 train_loader = DataLoader(train_subset, batch_size=batch_size, shuffle=True, collate_fn=one_hot_collate)
 test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, collate_fn=one_hot_collate)
 
-bw = 3.0
+bw = 1.0
 pts = 10000
 run_name = f"Laplace_bw{bw}_pts{pts}"
 logger.info(f"=== Training {run_name} ===")
@@ -84,7 +84,7 @@ model = LaplaceRFM(
     mem_gb=DEV_MEM_GB,
     diag=False
 )
-model.max_lstsq_size = 100 # Kích thước tối đa cho lstsq
+model.max_lstsq_size = 20000 # Kích thước tối đa cho lstsq
 
 model.fit(
     train_data=train_loader,
@@ -92,7 +92,7 @@ model.fit(
     classification=True,
     total_points_to_sample=pts,
     M_batch_size=64,
-    method='lstsq',
+    method='nmf',
     verbose=True,
     epochs=3,
     prefit_nmf=True,
