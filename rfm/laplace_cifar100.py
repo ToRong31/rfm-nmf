@@ -95,7 +95,7 @@ model.fit(
     method='nmf',
     verbose=True,
     epochs=3,
-    prefit_nmf=True,
+    prefit_nmf=False,
 )
 
 # wandb.finish()
