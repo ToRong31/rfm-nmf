@@ -26,7 +26,7 @@ def asm_nmf_fn(samples, map_fn, rank=10,layers=2, max_iter=100, init_mode='nndsv
 
     # deep_nsnmf trả về Tensor
     W_list, H_list, S_list, norms = deep_nsnmf(
-        kernel_matrix, layers, k_list, theta_list, max_iter, init_mode, lambda_sparseness=0.1
+        kernel_matrix, layers, k_list, theta_list, max_iter, init_mode, lambda_sparseness=0.3
     )
     
     # W_list, H_list, S_list, norms= deep_nsnmf_apg(
@@ -208,7 +208,7 @@ class KernelModel(nn.Module):
         sample_ids = torch.randperm(n_samples)[:n_subsamples].to(self.device)
         samples = self.centers[sample_ids]
 
-        W_list, H_list, S_list, norms = asm_nmf_fn(samples, self.kernel_fn, rank=n_labels, layers=3, verbose=verbose, device=self.device)
+        W_list, H_list, S_list, norms = asm_nmf_fn(samples, self.kernel_fn, rank=n_labels, layers=2, verbose=verbose, device=self.device)
 
         def nmf_projection_fn(grad, kmat):
             from .nmf import reconstruct_X
