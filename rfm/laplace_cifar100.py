@@ -60,7 +60,7 @@ batch_size = 16
 train_loader = DataLoader(train_subset, batch_size=batch_size, shuffle=True, collate_fn=one_hot_collate)
 test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, collate_fn=one_hot_collate)
 
-bw = 5.0
+bw = 3.0
 pts = 10000
 run_name = f"Laplace_bw{bw}_pts{pts}"
 logger.info(f"=== Training {run_name} ===")
