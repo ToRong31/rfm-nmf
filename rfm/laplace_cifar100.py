@@ -84,7 +84,7 @@ model = LaplaceRFM(
     mem_gb=DEV_MEM_GB,
     diag=False
 )
-model.max_lstsq_size = 800  # Kích thước tối đa cho lstsq
+model.max_lstsq_size = 100  # Kích thước tối đa cho lstsq
 
 model.fit(
     train_data=train_loader,
@@ -92,10 +92,10 @@ model.fit(
     classification=True,
     total_points_to_sample=pts,
     M_batch_size=64,
-    method='lstsq',
+    method='nmf',
     verbose=True,
     epochs=3,
-    prefit_nmf=True,
+    prefit_nmf=False,
 )
 
 wandb.finish()
