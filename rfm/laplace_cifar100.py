@@ -64,19 +64,19 @@ bw = 1.0
 pts = 10000
 run_name = f"Laplace_bw{bw}_pts{pts}"
 logger.info(f"=== Training {run_name} ===")
-wandb.login(key='cf3dc9c85e2330a83d886a54b44d32768b2d7b60')
-wandb.init(
-    project="rfm-nmf",
-    name=run_name,
-    config={
-        "bandwidth": bw,
-        "total_points_to_sample": pts,
-        "device": str(DEVICE),
-        "subset_size": subset_size,
-        "dataset": "CIFAR100",
-        "feature_extractor": "None (raw image)"
-    }
-)
+# wandb.login(key='cf3dc9c85e2330a83d886a54b44d32768b2d7b60')
+# wandb.init(
+#     project="rfm-nmf",
+#     name=run_name,
+#     config={
+#         "bandwidth": bw,
+#         "total_points_to_sample": pts,
+#         "device": str(DEVICE),
+#         "subset_size": subset_size,
+#         "dataset": "CIFAR100",
+#         "feature_extractor": "None (raw image)"
+#     }
+# )
 
 model = LaplaceRFM(
     bandwidth=bw,
@@ -84,7 +84,7 @@ model = LaplaceRFM(
     mem_gb=DEV_MEM_GB,
     diag=False
 )
-model.max_lstsq_size = 100  # Kích thước tối đa cho lstsq
+model.max_lstsq_size = 100000  # Kích thước tối đa cho lstsq
 
 model.fit(
     train_data=train_loader,
@@ -98,4 +98,4 @@ model.fit(
     prefit_nmf=True,
 )
 
-wandb.finish()
+# wandb.finish()
