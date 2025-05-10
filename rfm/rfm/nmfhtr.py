@@ -7,7 +7,7 @@ import torch.nn as nn
 import numpy as np
 from sklearn.metrics import roc_auc_score
 from .svd import nystrom_kernel_svd
-from .nmf import deep_nsnmf,multiplicative_update_nsnmf, reconstruct_X
+from .nmf import deep_nsnmf,multiplicative_update_nsnmf, reconstruct_X, deep_nsnmf_apg
 
 def to_tensor_list(np_list, device):
     return [torch.from_numpy(arr).float().to(device) for arr in np_list]
@@ -28,7 +28,9 @@ def asm_nmf_fn(samples, map_fn, rank=10,layers=2, max_iter=100, init_mode='nndsv
     W_list, H_list, S_list, norms = deep_nsnmf(
         kernel_matrix, layers, k_list, theta_list, max_iter, init_mode, lambda_sparseness=0.1
     )
-
+    
+    # W_list, H_list, S_list, norms= deep_nsnmf_apg(
+    #     kernel_matrix, layers, k_list, theta_list, max_iter, init_mode, lambda_s=0.1)
     # đảm bảo tất cả là tensor đúng device
     W_list = [w.to(device).float() for w in W_list]
     H_list = [h.to(device).float() for h in H_list]

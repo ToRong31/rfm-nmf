@@ -64,7 +64,7 @@ bw = 1.0
 pts = 10000
 run_name = f"Laplace_bw{bw}_pts{pts}"
 logger.info(f"=== Training {run_name} ===")
-
+wandb.login(key='cf3dc9c85e2330a83d886a54b44d32768b2d7b60')
 wandb.init(
     project="rfm-nmf",
     name=run_name,

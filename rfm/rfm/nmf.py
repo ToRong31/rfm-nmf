@@ -165,3 +165,56 @@ def reconstruct_X(W_list, S_list, H_final):
 
     return A @ S_list[-1].to(device) @ H_final
 
+# --- Phần còn lại giữ nguyên như trước ---
+def apg_minimize(H0, C, gradient_fn, max_iters=200, tol=1e-6):
+    L = torch.linalg.norm(C, 2)**2
+    H_k, Y_k, alpha = H0.clone(), H0.clone(), 1.0
+    for _ in range(max_iters):
+        grad = gradient_fn(Y_k)
+        H_next = (Y_k - grad / L).clamp(min=0)
+        alpha_next = (1 + (1 + 4*alpha**2)**0.5) / 2
+        Y_k = H_next + ((alpha-1)/alpha_next)*(H_next - H_k)
+        if (H_next - H_k).norm() / (H_k.norm()+1e-12) < tol:
+            break
+        H_k, alpha = H_next, alpha_next
+    return H_k
+
+def apg_nsnmf(A, k, S, W0, H0, lambda_s=0.1, max_iter=200):
+    W, H, norms = W0.clone(), H0.clone(), []
+    for _ in range(max_iter):
+        # cập nhật H
+        C = W @ S
+        def grad_H(h): return C.T @ (C @ h - A)
+        H = apg_minimize(H, C, grad_H, max_iters=50)
+
+        # cập nhật W (qua W^T)
+        Q = S @ H
+        C_tilde, M_tilde = Q.T, A.T
+        def grad_Wt(Wt): return C_tilde.T @ (C_tilde @ Wt - M_tilde) + lambda_s
+        W = apg_minimize(W.T, C_tilde, grad_Wt, max_iters=50).T
+
+        norms.append((A - W @ S @ H).norm().item())
+    return W, H, norms
+
+def deep_nsnmf_apg(X, layers, k_list, theta_list,
+                   max_iter_inner=200, init_mode='nndsvd', lambda_s=0.1):
+    W_list, H_list, S_list, errs = [], [], [], []
+    H_prev = X
+    for layer in range(layers):
+        k, theta = k_list[layer], theta_list[layer]
+
+        # thuần torch NNDSVD khởi tạo
+        W0, H0 = nndsvd_initialization(H_prev, k)
+
+        # tính S
+        S = compute_local_S(W0.T, sigma=theta)
+
+        # giải lớp này bằng APG
+        W, H, norms = apg_nsnmf(H_prev, k, S, W0, H0,
+                                lambda_s=lambda_s,
+                                max_iter=max_iter_inner)
+
+        W_list.append(W); H_list.append(H); S_list.append(S); errs.append(norms)
+        H_prev = H
+
+    return W_list, H_list, S_list, errs
