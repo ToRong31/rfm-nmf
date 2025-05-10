@@ -92,7 +92,7 @@ model.fit(
     classification=True,
     total_points_to_sample=pts,
     M_batch_size=64,
-    method='nmf',
+    method='lstsq',
     verbose=True,
     epochs=3,
     prefit_nmf=True,
